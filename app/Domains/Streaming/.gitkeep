@@ -1,0 +1,6 @@
+<?php
+
+declare(strict_types=1);
+
+// Streaming Domain - Placeholder
+// This domain handles: Posts, Videos, Moments, Embeds

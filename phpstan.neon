@@ -1,0 +1,25 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    paths:
+        - app/
+    
+    level: 8
+    
+    ignoreErrors:
+        # Ignore generic template issues in relationships
+        - '#Call to an undefined method Illuminate\\Database\\Eloquent\\Relations\\#'
+        # Laravel's fillable/hidden arrays have loose typing
+        - '#PHPDoc type array<int, string> of property .+::\$fillable is not covariant#'
+        - '#PHPDoc type array<int, string> of property .+::\$hidden is not covariant#'
+        - '#PHPDoc type array<int, string> of property .+::\$casts is not covariant#'
+        # HasFactory generic type
+        - '#uses generic trait .+HasFactory but does not specify its types#'
+        # Transaction callback types
+        - '#Parameter \#1 \$callback of static method Illuminate\\Database\\Connection::transaction\(\) expects Closure#'
+        - '#Unable to resolve the template type TCallbackReturnType in call to static method Illuminate\\Database\\Connection::transaction\(\)#'
+        - '#Parameter \#2 \$attempts of static method Illuminate\\Database\\Connection::transaction\(\)#'
+    
+    # Stricter rules
+    reportUnmatchedIgnoredErrors: false

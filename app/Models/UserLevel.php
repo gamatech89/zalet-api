@@ -131,22 +131,32 @@ class UserLevel extends Model
     }
 
     /**
-     * Add XP and level up if needed
+     * Add XP and level up if needed (with row-level locking to prevent race conditions)
      */
     public function addXp(int $amount): bool
     {
-        $this->xp += $amount;
-        $leveled = false;
-        $maxLevel = config('levels.max_level');
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($amount) {
+            // Lock the row for update to prevent race conditions
+            /** @var UserLevel $userLevel */
+            $userLevel = self::query()->lockForUpdate()->find($this->id);
+            
+            $userLevel->xp += $amount;
+            $leveled = false;
+            $maxLevel = config('levels.max_level');
 
-        while ($this->level < $maxLevel && $this->xp >= $this->getXpForLevel($this->level + 1)) {
-            $this->level++;
-            $leveled = true;
-        }
+            while ($userLevel->level < $maxLevel && $userLevel->xp >= $userLevel->getXpForLevel($userLevel->level + 1)) {
+                $userLevel->level++;
+                $leveled = true;
+            }
 
-        $this->save();
+            $userLevel->save();
+            
+            // Update current instance to reflect changes
+            $this->xp = $userLevel->xp;
+            $this->level = $userLevel->level;
 
-        return $leveled;
+            return $leveled;
+        });
     }
 
     /**

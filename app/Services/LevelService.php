@@ -23,8 +23,12 @@ class LevelService
      */
     public function awardWatchXp(User $user, int $minutes): bool
     {
+        if ($minutes <= 0) {
+            throw new \InvalidArgumentException('Minutes must be positive');
+        }
+
         $userLevel = $this->getUserLevel($user);
-        $xpPerMinute = config('levels.xp_rewards.watch_stream_per_minute');
+        $xpPerMinute = max(0, (int) config('levels.xp_rewards.watch_stream_per_minute'));
         
         return $userLevel->addXp($minutes * $xpPerMinute);
     }
@@ -34,8 +38,12 @@ class LevelService
      */
     public function awardStreamXp(User $user, int $minutes): bool
     {
+        if ($minutes <= 0) {
+            throw new \InvalidArgumentException('Minutes must be positive');
+        }
+
         $userLevel = $this->getUserLevel($user);
-        $xpPerMinute = config('levels.xp_rewards.stream_per_minute');
+        $xpPerMinute = max(0, (int) config('levels.xp_rewards.stream_per_minute'));
         
         return $userLevel->addXp($minutes * $xpPerMinute);
     }
@@ -45,10 +53,14 @@ class LevelService
      */
     public function awardReceiveGiftXp(User $user, int $giftValue): bool
     {
+        if ($giftValue <= 0) {
+            throw new \InvalidArgumentException('Gift value must be positive');
+        }
+
         $userLevel = $this->getUserLevel($user);
-        $multiplier = config('levels.xp_rewards.receive_gift_multiplier');
+        $multiplier = max(0, (float) config('levels.xp_rewards.receive_gift_multiplier'));
         
-        return $userLevel->addXp($giftValue * $multiplier);
+        return $userLevel->addXp((int) ($giftValue * $multiplier));
     }
 
     /**
@@ -56,10 +68,14 @@ class LevelService
      */
     public function awardSendGiftXp(User $user, int $giftValue): bool
     {
+        if ($giftValue <= 0) {
+            throw new \InvalidArgumentException('Gift value must be positive');
+        }
+
         $userLevel = $this->getUserLevel($user);
-        $multiplier = config('levels.xp_rewards.send_gift_multiplier');
+        $multiplier = max(0, (float) config('levels.xp_rewards.send_gift_multiplier'));
         
-        return $userLevel->addXp($giftValue * $multiplier);
+        return $userLevel->addXp((int) ($giftValue * $multiplier));
     }
 
     /**
@@ -76,7 +92,7 @@ class LevelService
         $userLevel->bar_messages_today++;
         $userLevel->save();
 
-        $xp = config('levels.xp_rewards.bar_message');
+        $xp = max(0, (int) config('levels.xp_rewards.bar_message'));
         return $userLevel->addXp($xp);
     }
 
@@ -94,7 +110,7 @@ class LevelService
         $userLevel->bar_reactions_today++;
         $userLevel->save();
 
-        $xp = config('levels.xp_rewards.bar_reaction');
+        $xp = max(0, (int) config('levels.xp_rewards.bar_reaction'));
         return $userLevel->addXp($xp);
     }
 
@@ -104,7 +120,7 @@ class LevelService
     public function awardCreateEventXp(User $user): bool
     {
         $userLevel = $this->getUserLevel($user);
-        $xp = config('levels.xp_rewards.create_bar_event');
+        $xp = max(0, (int) config('levels.xp_rewards.create_bar_event'));
         
         return $userLevel->addXp($xp);
     }
@@ -115,7 +131,7 @@ class LevelService
     public function awardHostStreamXp(User $user): bool
     {
         $userLevel = $this->getUserLevel($user);
-        $xp = config('levels.xp_rewards.host_bar_stream');
+        $xp = max(0, (int) config('levels.xp_rewards.host_bar_stream'));
         
         return $userLevel->addXp($xp);
     }

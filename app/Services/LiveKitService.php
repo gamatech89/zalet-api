@@ -13,14 +13,16 @@ class LiveKitService
     private string $apiKey;
     private string $apiSecret;
     private string $host;
-    private int $tokenTtl;
+    private int $tokenTtlViewer;
+    private int $tokenTtlStreamer;
 
     public function __construct()
     {
         $this->apiKey = config('livekit.api_key');
         $this->apiSecret = config('livekit.api_secret');
         $this->host = config('livekit.host');
-        $this->tokenTtl = config('livekit.token_ttl', 86400);
+        $this->tokenTtlViewer = config('livekit.token_ttl_viewer', 14400); // 4 hours
+        $this->tokenTtlStreamer = config('livekit.token_ttl_streamer', 28800); // 8 hours
     }
 
     /**
@@ -31,7 +33,7 @@ class LiveKitService
         $tokenOptions = (new AccessTokenOptions())
             ->setIdentity($user->id . ':' . ($user->profile?->username ?? 'user'))
             ->setName($user->profile?->display_name ?? $user->email)
-            ->setTtl($this->tokenTtl);
+            ->setTtl($this->tokenTtlStreamer);
 
         $videoGrant = (new VideoGrant())
             ->setRoomJoin(true)
@@ -50,6 +52,7 @@ class LiveKitService
             'room_name' => $roomName,
             'ws_url' => config('livekit.ws_url'),
             'identity' => $tokenOptions->getIdentity(),
+            'expires_in' => $this->tokenTtlStreamer,
         ];
     }
 
@@ -61,7 +64,7 @@ class LiveKitService
         $tokenOptions = (new AccessTokenOptions())
             ->setIdentity($user->id . ':viewer:' . ($user->profile?->username ?? 'user'))
             ->setName($user->profile?->display_name ?? $user->email)
-            ->setTtl($this->tokenTtl);
+            ->setTtl($this->tokenTtlViewer);
 
         $videoGrant = (new VideoGrant())
             ->setRoomJoin(true)
@@ -80,6 +83,7 @@ class LiveKitService
             'room_name' => $roomName,
             'ws_url' => config('livekit.ws_url'),
             'identity' => $tokenOptions->getIdentity(),
+            'expires_in' => $this->tokenTtlViewer,
         ];
     }
 

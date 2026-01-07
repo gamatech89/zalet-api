@@ -95,10 +95,7 @@ class BarController extends Controller
      */
     public function show(Bar $bar): JsonResponse
     {
-        $bar->load([
-            'owner.profile',
-            'members.user.profile',
-        ]);
+        $bar->load(['owner.profile']);
         $bar->loadCount('members');
 
         return response()->json([

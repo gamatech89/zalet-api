@@ -20,7 +20,10 @@ final class UserResource extends BaseResource
         return [
             'id' => $this->id,  // numeric ID for relations
             'uuid' => $this->uuid,
-            'email' => $this->email,
+            'email' => $this->when(
+                $request->user()?->id === $this->id,
+                $this->email
+            ), // Only show email to the user themselves
             'role' => $this->role->value,
             'emailVerifiedAt' => $this->email_verified_at?->toIso8601String(),
             'profile' => $this->whenLoaded('profile', fn () => new ProfileResource($this->profile)),

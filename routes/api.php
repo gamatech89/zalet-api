@@ -37,8 +37,8 @@ use Illuminate\Support\Facades\Route;
 // API Version 1
 Route::prefix('v1')->group(function (): void {
 
-    // Public routes
-    Route::prefix('auth')->group(function (): void {
+    // Public routes - stricter rate limits for auth
+    Route::prefix('auth')->middleware('throttle:10,1')->group(function (): void {
         Route::post('register', [AuthController::class, 'register'])->name('auth.register');
         Route::post('login', [AuthController::class, 'login'])->name('auth.login');
     });
@@ -57,8 +57,8 @@ Route::prefix('v1')->group(function (): void {
     Route::get('feed', [PostController::class, 'feed'])->name('feed');
     Route::get('posts/{uuid}', [PostController::class, 'show'])->name('posts.show');
 
-    // Protected routes
-    Route::middleware('auth:sanctum')->group(function (): void {
+    // Protected routes - general rate limit of 120 requests per minute
+    Route::middleware(['auth:sanctum', 'throttle:120,1'])->group(function (): void {
 
         // Auth
         Route::prefix('auth')->group(function (): void {
@@ -88,18 +88,20 @@ Route::prefix('v1')->group(function (): void {
         Route::prefix('wallet')->group(function (): void {
             Route::get('/', [WalletController::class, 'show'])->name('wallet.show');
             Route::get('transactions', [WalletController::class, 'transactions'])->name('wallet.transactions');
-            Route::post('transfer', [WalletController::class, 'transfer'])->name('wallet.transfer');
             Route::get('transaction-types', [WalletController::class, 'types'])->name('wallet.types');
 
-            // Credit purchases
-            Route::get('packages', [PurchaseController::class, 'packages'])->name('wallet.packages');
-            Route::post('purchase', [PurchaseController::class, 'initiate'])->name('wallet.purchase');
-            Route::get('purchase/{uuid}/status', [PurchaseController::class, 'status'])->name('wallet.purchase.status');
-            Route::get('purchase/history', [PurchaseController::class, 'history'])->name('wallet.purchase.history');
+            // Credit purchases and transfers - stricter rate limits (20 per minute)
+            Route::middleware('throttle:20,1')->group(function (): void {
+                Route::post('transfer', [WalletController::class, 'transfer'])->name('wallet.transfer');
+                Route::get('packages', [PurchaseController::class, 'packages'])->name('wallet.packages');
+                Route::post('purchase', [PurchaseController::class, 'initiate'])->name('wallet.purchase');
+                Route::get('purchase/{uuid}/status', [PurchaseController::class, 'status'])->name('wallet.purchase.status');
+                Route::get('purchase/history', [PurchaseController::class, 'history'])->name('wallet.purchase.history');
+            });
         });
 
-        // Gift system
-        Route::prefix('gifts')->group(function (): void {
+        // Gift system - stricter rate limits (30 per minute)
+        Route::prefix('gifts')->middleware('throttle:30,1')->group(function (): void {
             Route::get('/', [GiftController::class, 'catalog'])->name('gifts.catalog');
             Route::post('send', [GiftController::class, 'send'])->name('gifts.send');
         });

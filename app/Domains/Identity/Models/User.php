@@ -8,6 +8,9 @@ use App\Domains\Duel\Models\Conversation;
 use App\Domains\Shared\Enums\UserRole;
 use App\Domains\Shared\Traits\HasUuid;
 use App\Domains\Wallet\Models\Wallet;
+use App\Models\Bar;
+use App\Models\BarMember;
+use App\Models\UserLevel;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -173,5 +176,35 @@ class User extends Authenticatable
     public function unreadNotificationsCount(): int
     {
         return $this->appNotifications()->unread()->count();
+    }
+
+    /**
+     * Get user's level info.
+     *
+     * @return HasOne<UserLevel, $this>
+     */
+    public function level(): HasOne
+    {
+        return $this->hasOne(UserLevel::class);
+    }
+
+    /**
+     * Get bars owned by this user.
+     *
+     * @return HasMany<Bar, $this>
+     */
+    public function ownedBars(): HasMany
+    {
+        return $this->hasMany(Bar::class, 'owner_id');
+    }
+
+    /**
+     * Get bar memberships.
+     *
+     * @return HasMany<BarMember, $this>
+     */
+    public function barMemberships(): HasMany
+    {
+        return $this->hasMany(BarMember::class);
     }
 }

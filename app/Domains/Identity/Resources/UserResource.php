@@ -18,7 +18,8 @@ final class UserResource extends BaseResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->uuid,
+            'id' => $this->id,  // numeric ID for relations
+            'uuid' => $this->uuid,
             'email' => $this->email,
             'role' => $this->role->value,
             'emailVerifiedAt' => $this->email_verified_at?->toIso8601String(),

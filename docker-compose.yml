@@ -141,6 +141,21 @@ services:
         depends_on:
             - app
 
+    # LiveKit Server (WebRTC Streaming)
+    livekit:
+        image: livekit/livekit-server:latest
+        container_name: uzivo_livekit
+        restart: unless-stopped
+        ports:
+            - "7880:7880" # HTTP API
+            - "7881:7881" # RTC over TCP
+            - "7882:7882/udp" # RTC over UDP
+        environment:
+            LIVEKIT_KEYS: "${LIVEKIT_API_KEY:-devkey}: ${LIVEKIT_API_SECRET:-devsecret123456789012345678901234}"
+        command: --dev --bind 0.0.0.0
+        networks:
+            - uzivo_network
+
 networks:
     uzivo_network:
         driver: bridge

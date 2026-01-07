@@ -16,6 +16,11 @@ use App\Http\Controllers\Api\PurchaseController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\WalletController;
 use App\Http\Controllers\Api\WebhookController;
+use App\Http\Controllers\BarController;
+use App\Http\Controllers\BarEventController;
+use App\Http\Controllers\BarMessageController;
+use App\Http\Controllers\LevelController;
+use App\Http\Controllers\LiveKitController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -149,6 +154,75 @@ Route::prefix('v1')->group(function (): void {
             Route::post('read', [NotificationController::class, 'markMultipleAsRead'])->name('notifications.markMultipleAsRead');
             Route::delete('{uuid}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
             Route::delete('/', [NotificationController::class, 'destroyMultiple'])->name('notifications.destroyMultiple');
+        });
+
+        // Levels & XP System
+        Route::prefix('levels')->group(function (): void {
+            Route::get('me', [LevelController::class, 'me'])->name('levels.me');
+            Route::get('tiers', [LevelController::class, 'tiers'])->name('levels.tiers');
+            Route::get('bar-perks', [LevelController::class, 'barPerks'])->name('levels.barPerks');
+            Route::get('can-create-bar', [LevelController::class, 'canCreateBar'])->name('levels.canCreateBar');
+        });
+
+        // Bars (Kafane)
+        Route::prefix('bars')->group(function (): void {
+            Route::get('/', [BarController::class, 'index'])->name('bars.index');
+            Route::get('search', [BarController::class, 'search'])->name('bars.search');
+            Route::get('my', [BarController::class, 'myBars'])->name('bars.my');
+            Route::get('owned', [BarController::class, 'ownedBars'])->name('bars.owned');
+            Route::post('/', [BarController::class, 'store'])->name('bars.store');
+            Route::get('{bar}', [BarController::class, 'show'])->name('bars.show');
+            Route::put('{bar}', [BarController::class, 'update'])->name('bars.update');
+            Route::delete('{bar}', [BarController::class, 'destroy'])->name('bars.destroy');
+
+            // Membership
+            Route::post('{bar}/join', [BarController::class, 'join'])->name('bars.join');
+            Route::post('{bar}/leave', [BarController::class, 'leave'])->name('bars.leave');
+            Route::get('{bar}/members', [BarController::class, 'members'])->name('bars.members');
+
+            // Moderation
+            Route::post('{bar}/kick', [BarController::class, 'kickMember'])->name('bars.kick');
+            Route::post('{bar}/promote', [BarController::class, 'promoteMember'])->name('bars.promote');
+            Route::post('{bar}/demote', [BarController::class, 'demoteMember'])->name('bars.demote');
+            Route::post('{bar}/mute', [BarController::class, 'muteMember'])->name('bars.mute');
+
+            // Messages
+            Route::get('{bar}/messages', [BarMessageController::class, 'index'])->name('bars.messages.index');
+            Route::get('{bar}/messages/since', [BarMessageController::class, 'since'])->name('bars.messages.since');
+            Route::post('{bar}/messages', [BarMessageController::class, 'store'])->name('bars.messages.store');
+            Route::delete('{bar}/messages/{message}', [BarMessageController::class, 'destroy'])->name('bars.messages.destroy');
+
+            // Reactions
+            Route::post('{bar}/messages/{message}/reactions', [BarMessageController::class, 'addReaction'])->name('bars.messages.reactions.add');
+            Route::delete('{bar}/messages/{message}/reactions', [BarMessageController::class, 'removeReaction'])->name('bars.messages.reactions.remove');
+
+            // Events
+            Route::get('{bar}/events', [BarEventController::class, 'index'])->name('bars.events.index');
+            Route::post('{bar}/events', [BarEventController::class, 'store'])->name('bars.events.store');
+            Route::get('{bar}/events/{event}', [BarEventController::class, 'show'])->name('bars.events.show');
+            Route::put('{bar}/events/{event}', [BarEventController::class, 'update'])->name('bars.events.update');
+            Route::post('{bar}/events/{event}/start', [BarEventController::class, 'start'])->name('bars.events.start');
+            Route::post('{bar}/events/{event}/end', [BarEventController::class, 'end'])->name('bars.events.end');
+            Route::post('{bar}/events/{event}/cancel', [BarEventController::class, 'cancel'])->name('bars.events.cancel');
+        });
+
+        // Global Events
+        Route::get('events/upcoming', [BarEventController::class, 'upcoming'])->name('events.upcoming');
+        Route::get('events/live', [BarEventController::class, 'live'])->name('events.live');
+        Route::get('events/my', [BarEventController::class, 'myEvents'])->name('events.my');
+
+        // LiveKit WebRTC Streaming
+        Route::prefix('livekit')->group(function (): void {
+            Route::get('server-info', [LiveKitController::class, 'getServerInfo'])->name('livekit.server-info');
+            Route::post('token/streamer', [LiveKitController::class, 'getStreamerToken'])->name('livekit.token.streamer');
+            Route::post('token/viewer', [LiveKitController::class, 'getViewerToken'])->name('livekit.token.viewer');
+            Route::get('streams/{session}/token', [LiveKitController::class, 'getStreamToken'])->name('livekit.stream.token');
+            
+            // Stream management
+            Route::post('streams', [LiveKitController::class, 'createStream'])->name('livekit.streams.create');
+            Route::post('streams/{session}/start', [LiveKitController::class, 'startStream'])->name('livekit.streams.start');
+            Route::post('streams/{session}/end', [LiveKitController::class, 'endStream'])->name('livekit.streams.end');
+            Route::get('streams/live', [LiveKitController::class, 'getLiveStreams'])->name('livekit.streams.live');
         });
     });
 

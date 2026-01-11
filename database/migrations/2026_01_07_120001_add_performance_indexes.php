@@ -58,11 +58,8 @@ return new class extends Migration
             $table->index(['type', 'is_active'], 'chat_rooms_type_active_idx');
         });
 
-        // Messages - for conversation queries
-        Schema::table('messages', function (Blueprint $table) {
-            $table->index(['conversation_id', 'created_at'], 'messages_conversation_created_idx');
-            $table->index(['chat_room_id', 'created_at'], 'messages_room_created_idx');
-        });
+        // Messages - for room queries (chat_room_id index already exists from initial migration)
+        // Note: conversation_id column does not exist in messages table
     }
 
     /**
@@ -109,9 +106,6 @@ return new class extends Migration
             $table->dropIndex('chat_rooms_type_active_idx');
         });
 
-        Schema::table('messages', function (Blueprint $table) {
-            $table->dropIndex('messages_conversation_created_idx');
-            $table->dropIndex('messages_room_created_idx');
-        });
+        // Messages indexes removed as conversation_id doesn't exist
     }
 };

@@ -21,12 +21,12 @@ describe('Get User by UUID', function (): void {
             ->assertJsonStructure([
                 'data' => [
                     'id',
-                    'email',
                     'role',
                     'profile',
                     'createdAt',
                 ],
-            ]);
+            ])
+            ->assertJsonMissing(['email' => $user->email]); // Email hidden for non-owners
     });
 
     test('user data includes profile', function (): void {

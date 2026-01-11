@@ -33,7 +33,6 @@ describe('Auth Registration', function (): void {
                 'data' => [
                     'user' => [
                         'id',
-                        'email',
                         'role',
                         'profile' => [
                             'username',
@@ -47,7 +46,18 @@ describe('Auth Registration', function (): void {
                     'token',
                 ],
                 'message',
-            ]);
+            ])
+            ->assertJsonPath('data.user.role', 'user');
+
+        // Verify user was created in database with email
+        $this->assertDatabaseHas('users', [
+            'email' => 'test@example.com',
+        ]);
+        
+        // Verify profile was created with username
+        $this->assertDatabaseHas('profiles', [
+            'username' => 'testuser',
+        ]);
 
         expect(User::where('email', 'test@example.com')->exists())->toBeTrue();
     });
@@ -156,11 +166,12 @@ describe('Auth Login', function (): void {
         $response->assertOk()
             ->assertJsonStructure([
                 'data' => [
-                    'user' => ['id', 'email', 'role'],
+                    'user' => ['id', 'role'],
                     'token',
                 ],
                 'message',
-            ]);
+            ])
+            ->assertJsonPath('data.message', null); // No data.message, only root message
     });
 
     it('fails with invalid credentials', function (): void {

@@ -279,7 +279,7 @@ describe('DELETE /api/v1/notifications/{uuid}', function (): void {
         $response = $this->deleteJson('/api/v1/notifications/' . $uuid);
 
         $response->assertOk()
-            ->assertJsonPath('data.message', 'Notification deleted');
+            ->assertJsonPath('message', 'Notification deleted.');
 
         expect(Notification::where('uuid', $uuid)->exists())->toBeFalse();
     });

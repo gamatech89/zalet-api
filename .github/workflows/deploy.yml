@@ -1,0 +1,38 @@
+name: Deploy API
+
+on:
+  push:
+    branches: [main, master]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            cd /var/www/zalet-api
+
+            git config --global --add safe.directory /var/www/zalet-api
+            git fetch origin
+            git reset --hard origin/master
+
+            composer install --no-dev --optimize-autoloader --no-interaction
+
+            php artisan migrate --force
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
+
+            chown -R www-data:www-data /var/www/zalet-api
+            chmod -R 775 /var/www/zalet-api/storage /var/www/zalet-api/bootstrap/cache
+
+            supervisorctl restart zalet-queue:*
+            supervisorctl restart zalet-reverb
+
+            echo "API deployed successfully"

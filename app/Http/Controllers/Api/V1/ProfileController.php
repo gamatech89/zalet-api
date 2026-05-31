@@ -71,19 +71,16 @@ class ProfileController extends Controller
 
         // Delete old avatar if exists
         if ($profile->avatar_url) {
-            $oldPath = str_replace('/storage/', '', $profile->avatar_url);
-            Storage::disk('public')->delete($oldPath);
+            $oldPath = ltrim(parse_url($profile->avatar_url, PHP_URL_PATH), '/');
+            Storage::delete($oldPath);
         }
 
-        // Store new avatar
-        $path = $request->file('avatar')->store(
-            "avatars/{$user->id}",
-            'public'
-        );
+        // Store new avatar on default disk (s3 in production)
+        $path = $request->file('avatar')->store("avatars/{$user->id}");
 
-        // Update profile with new avatar URL
+        // Update profile with full URL
         $profile->update([
-            'avatar_url' => '/storage/' . $path,
+            'avatar_url' => Storage::url($path),
         ]);
 
         return response()->json([
@@ -108,18 +105,15 @@ class ProfileController extends Controller
 
         // Delete old cover if exists
         if ($profile->cover_url) {
-            $oldPath = str_replace('/storage/', '', $profile->cover_url);
-            Storage::disk('public')->delete($oldPath);
+            $oldPath = ltrim(parse_url($profile->cover_url, PHP_URL_PATH), '/');
+            Storage::delete($oldPath);
         }
 
-        // Store new cover
-        $path = $request->file('cover')->store(
-            "covers/{$user->id}",
-            'public'
-        );
+        // Store new cover on default disk (s3 in production)
+        $path = $request->file('cover')->store("covers/{$user->id}");
 
         $profile->update([
-            'cover_url' => '/storage/' . $path,
+            'cover_url' => Storage::url($path),
         ]);
 
         return response()->json([

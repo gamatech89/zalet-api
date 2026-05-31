@@ -11,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 
 class AuthController extends Controller
 {
@@ -76,6 +77,23 @@ class AuthController extends Controller
             'message' => 'Login successful.',
             'user' => $user->load('profile', 'wallet'),
             'token' => $token,
+        ]);
+    }
+
+    /**
+     * Send a password reset link to the given email.
+     *
+     * POST /api/v1/auth/forgot-password
+     */
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $request->validate(['email' => 'required|email']);
+
+        Password::sendResetLink($request->only('email'));
+
+        // Always return success — don't leak whether the email exists
+        return response()->json([
+            'message' => 'If an account with that email exists, a reset link has been sent.',
         ]);
     }
 

@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -22,6 +23,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Register broadcasting auth route with Sanctum so Bearer tokens work
+        Broadcast::routes(['middleware' => ['auth:sanctum']]);
+        require base_path('routes/channels.php');
+
         $this->configureRateLimiting();
     }
 

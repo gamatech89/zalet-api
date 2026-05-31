@@ -16,9 +16,10 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
             set -e
+
+            git config --global --add safe.directory /var/www/zalet-api 2>/dev/null || true
             cd /var/www/zalet-api
 
-            git config --global --add safe.directory /var/www/zalet-api
             git fetch origin
             git reset --hard origin/master
 

@@ -169,12 +169,19 @@ class ScenaController extends Controller
                 requiredPlanLevel: $request->input('required_plan_level')
             );
 
+            // Store thumbnail if provided
+            if ($request->hasFile('thumbnail')) {
+                $thumbnailUrl = $this->mediaService->storeThumbnail($request->file('thumbnail'));
+                $media->update(['thumbnail_url' => $thumbnailUrl]);
+            }
+
             return response()->json([
                 'message' => 'Scena video uploaded successfully',
                 'data' => [
                     'id' => $media->id,
                     'title' => $media->title,
                     'url' => $this->mediaService->getMediaUrl($media),
+                    'thumbnail_url' => $media->thumbnail_url,
                     'is_ppv' => $media->is_ppv,
                     'price_coins' => $media->price_coins,
                 ],

@@ -187,6 +187,60 @@ class ScenaController extends Controller
     }
 
     /**
+     * Update scena metadata (title, description, thumbnail, access settings).
+     * Video file is immutable — only metadata can change.
+     *
+     * PATCH /api/v1/scena/{media}
+     */
+    public function update(Request $request, Media $media): JsonResponse
+    {
+        if ($media->type !== 'long_form') {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        if (Gate::denies('update', $media)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $request->validate([
+            'title'               => 'sometimes|string|max:255',
+            'description'         => 'nullable|string|max:2000',
+            'thumbnail'           => 'nullable|image|mimes:jpeg,png,webp|max:5120',
+            'is_ppv'              => 'sometimes|boolean',
+            'price_coins'         => 'required_if:is_ppv,true|numeric|min:1',
+            'access_level'        => 'sometimes|string|in:free,premium,vip',
+            'required_plan_level' => 'nullable|integer|min:1|max:10',
+        ]);
+
+        $data = $request->only(['title', 'description', 'is_ppv', 'access_level', 'required_plan_level']);
+
+        if ($request->boolean('is_ppv')) {
+            $data['price_coins'] = $request->input('price_coins');
+        } else {
+            $data['price_coins'] = null;
+        }
+
+        if ($request->hasFile('thumbnail')) {
+            $data['thumbnail_url'] = $this->mediaService->storeThumbnail($request->file('thumbnail'));
+        }
+
+        $media->update($data);
+
+        return response()->json([
+            'message' => 'Scena updated successfully',
+            'data'    => [
+                'id'            => $media->id,
+                'title'         => $media->title,
+                'description'   => $media->description,
+                'thumbnail_url' => $media->thumbnail_url,
+                'is_ppv'        => $media->is_ppv,
+                'price_coins'   => $media->price_coins,
+                'access_level'  => $media->access_level,
+            ],
+        ]);
+    }
+
+    /**
      * Delete a scena video.
      *
      * DELETE /api/v1/scena/{media}

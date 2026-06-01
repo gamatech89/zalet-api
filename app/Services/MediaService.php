@@ -60,6 +60,17 @@ class MediaService
     }
 
     /**
+     * Store a thumbnail image and return its public URL.
+     */
+    public function storeThumbnail(UploadedFile $file, string $folder = 'thumbnails'): string
+    {
+        $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
+        $path = "{$folder}/{$filename}";
+        Storage::put($path, file_get_contents($file->getRealPath()));
+        return Storage::url($path);
+    }
+
+    /**
      * Delete media and free storage.
      */
     public function deleteMedia(Media $media): void

@@ -283,6 +283,7 @@ Route::prefix('v1')->group(function () {
                     // Scena (long-form video upload + embed) - creator only
                     Route::post('/scena/embed', [ScenaController::class , 'embed']);
                     Route::post('/scena', [ScenaController::class , 'store']);
+                    Route::post('/scena/{media}', [ScenaController::class , 'update']);
                     Route::delete('/scena/{media}', [ScenaController::class , 'destroy']);
 
                     // Live Streaming management - creator only

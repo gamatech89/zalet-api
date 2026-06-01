@@ -35,8 +35,8 @@ class MediaService
         $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
         $path = "videos/{$user->id}/{$filename}";
 
-        // Store the file
-        Storage::disk('media')->put($path, file_get_contents($file->getRealPath()));
+        // Store the file on S3 (falls back to local in dev if S3 not configured)
+        Storage::put($path, file_get_contents($file->getRealPath()));
 
         // Create media record
         $media = Media::create([
@@ -77,7 +77,7 @@ class MediaService
     {
         // Only delete file for native content
         if ($media->provider === 'native' && $media->url) {
-            Storage::disk('media')->delete($media->url);
+            Storage::delete($media->url);
 
             // Decrement user's storage
             $media->user->decrement('storage_used_bytes', $media->size_bytes);
@@ -95,6 +95,6 @@ class MediaService
             return $media->url;
         }
 
-        return Storage::disk('media')->url($media->url);
+        return Storage::url($media->url);
     }
 }

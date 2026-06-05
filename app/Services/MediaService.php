@@ -35,8 +35,8 @@ class MediaService
         $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
         $path = "videos/{$user->id}/{$filename}";
 
-        // Store the file on S3 (falls back to local in dev if S3 not configured)
-        Storage::put($path, file_get_contents($file->getRealPath()));
+        // Stream upload — avoids loading entire file into PHP memory
+        Storage::put($path, fopen($file->getRealPath(), 'r'));
 
         // Create media record
         $media = Media::create([
@@ -66,7 +66,7 @@ class MediaService
     {
         $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
         $path = "{$folder}/{$filename}";
-        Storage::put($path, file_get_contents($file->getRealPath()));
+        Storage::put($path, fopen($file->getRealPath(), 'r'));
         return Storage::url($path);
     }
 

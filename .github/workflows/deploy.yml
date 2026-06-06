@@ -15,7 +15,6 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: root
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          connect_timeout: 30s
           script: |
             set -e
 
@@ -23,7 +22,7 @@ jobs:
             cd /var/www/zalet-api
 
             git fetch origin
-            git reset --hard origin/master
+            git reset --hard origin/main
 
             composer install --no-dev --optimize-autoloader --no-interaction
 

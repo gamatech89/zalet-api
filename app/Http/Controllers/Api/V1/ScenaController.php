@@ -79,7 +79,8 @@ class ScenaController extends Controller
             return response()->json(['message' => 'Not found'], 404);
         }
 
-        $user = $request->user();
+        // Use sanctum guard to optionally resolve user on public route
+        $user = $request->user() ?? auth('sanctum')->user();
         $accessInfo = $this->contentAccessService->getAccessInfo($user, $media);
 
         if (!$accessInfo['can_access']) {

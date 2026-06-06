@@ -54,7 +54,7 @@ class MomentController extends Controller
             return response()->json(['message' => 'Not found'], 404);
         }
 
-        $user = $request->user();
+        $user = $request->user() ?? auth('sanctum')->user();
         $accessInfo = $this->contentAccessService->getAccessInfo($user, $media);
 
         if (!$accessInfo['can_access']) {

@@ -20,6 +20,34 @@ class NotificationController extends Controller
             ->orderByDesc('created_at')
             ->paginate($request->input('per_page', 20));
 
+        // Get all unique media IDs from the notifications
+        $mediaIds = [];
+        foreach ($notifications->items() as $notification) {
+            if (isset($notification->data['media_id'])) {
+                $mediaIds[] = $notification->data['media_id'];
+            }
+        }
+        $mediaIds = array_unique($mediaIds);
+
+        // Fetch their types
+        $mediaTypes = [];
+        if (!empty($mediaIds)) {
+            $mediaTypes = \App\Models\Media::whereIn('id', $mediaIds)
+                ->pluck('type', 'id')
+                ->toArray();
+        }
+
+        // Map them back to the notification data
+        $notifications->getCollection()->transform(function ($notification) use ($mediaTypes) {
+            if (isset($notification->data['media_id'])) {
+                $mediaId = $notification->data['media_id'];
+                $data = $notification->data;
+                $data['media_type'] = $mediaTypes[$mediaId] ?? 'moment'; // Fallback to moment
+                $notification->data = $data;
+            }
+            return $notification;
+        });
+
         return response()->json($notifications);
     }
 

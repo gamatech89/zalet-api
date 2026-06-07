@@ -147,6 +147,31 @@ class ConversationController extends Controller
     }
 
     /**
+     * Get the count of unread conversations.
+     * GET /api/v1/conversations/unread-count
+     */
+    public function unreadCount(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $count = $user->conversations()
+            ->where(function ($query) use ($user) {
+                $query->whereHas('messages', function ($mQuery) use ($user) {
+                    $mQuery->where('sender_id', '!=', $user->id)
+                        ->where(function ($subQuery) {
+                            $subQuery->whereRaw('messages.created_at > conversation_user.last_read_at')
+                                ->orWhereNull('conversation_user.last_read_at');
+                        });
+                });
+            })
+            ->count();
+
+        return response()->json([
+            'unread_count' => $count,
+        ]);
+    }
+
+    /**
      * Generate a display name for DM conversations (other user's name).
      */
     private function getConversationName(Conversation $conversation, $currentUser): string

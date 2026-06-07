@@ -22,9 +22,17 @@ class MessageSentEvent implements ShouldBroadcastNow
      */
     public function broadcastOn(): array
     {
-        return [
+        $channels = [
             new PrivateChannel('conversation.' . $this->message->conversation_id),
         ];
+
+        // Also broadcast to each participant's private user channel
+        $this->message->loadMissing('conversation.users');
+        foreach ($this->message->conversation->users as $user) {
+            $channels[] = new PrivateChannel('user.' . $user->id);
+        }
+
+        return $channels;
     }
 
     /**

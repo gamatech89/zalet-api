@@ -144,4 +144,41 @@ class ConversationTest extends TestCase
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['user_ids']);
     }
+
+    public function test_user_can_get_unread_conversations_count(): void
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+
+        // Create a conversation
+        $conversation = Conversation::factory()->create(['is_group' => false]);
+        $conversation->users()->attach([
+            $user->id => ['joined_at' => now(), 'last_read_at' => null],
+            $otherUser->id => ['joined_at' => now(), 'last_read_at' => null],
+        ]);
+
+        // Send a message from otherUser
+        $message = $conversation->messages()->create([
+            'sender_id' => $otherUser->id,
+            'content' => 'Hello there',
+            'message_type' => 'text',
+        ]);
+
+        // Fetch unread count, should be 1
+        $response = $this->actingAs($user)
+            ->getJson('/api/v1/conversations/unread-count');
+
+        $response->assertStatus(200)
+            ->assertJsonPath('unread_count', 1);
+
+        // Mark read (by loading messages)
+        $this->actingAs($user)->getJson("/api/v1/conversations/{$conversation->id}/messages");
+
+        // Fetch unread count, should be 0
+        $response = $this->actingAs($user)
+            ->getJson('/api/v1/conversations/unread-count');
+
+        $response->assertStatus(200)
+            ->assertJsonPath('unread_count', 0);
+    }
 }

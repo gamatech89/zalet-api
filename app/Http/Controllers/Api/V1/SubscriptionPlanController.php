@@ -16,6 +16,7 @@ class SubscriptionPlanController extends Controller
     public function index(): JsonResponse
     {
         $plans = SubscriptionPlan::active()
+            ->where('level', '>', 0)
             ->ordered()
             ->get()
             ->map(fn ($plan) => [

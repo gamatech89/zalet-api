@@ -96,8 +96,8 @@ class MomentController extends Controller
      */
     public function store(StoreMomentRequest $request): JsonResponse
     {
-        // Posting moments requires an active paid subscription
-        if (!$request->user()->hasSubscriptionLevel(1)) {
+        // Posting moments requires an active paid subscription (creators are exempt)
+        if (!$request->user()->isCreator() && !$request->user()->hasSubscriptionLevel(1)) {
             return response()->json([
                 'message' => 'Posting moments requires an active subscription. Upgrade your plan to continue.',
                 'error_type' => 'plan_required',

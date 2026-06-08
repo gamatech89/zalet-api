@@ -15,6 +15,7 @@ class StoreMomentRequest extends FormRequest
     {
         return [
             'video' => ['required', 'file', 'mimes:mp4,mov,avi,webm', 'max:102400'], // 100MB max
+            'thumbnail' => ['nullable', 'image', 'mimes:jpeg,png,webp', 'max:5120'], // 5MB
             'title' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:2000'],
             'is_ppv' => ['boolean'],

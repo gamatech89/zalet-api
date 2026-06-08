@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Media;
+use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Services\CoinService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -25,6 +27,26 @@ class MomentTest extends TestCase
             'storage_limit_mb' => 512,
             'storage_used_bytes' => 0,
         ]);
+
+        // Posting moments requires an active paid subscription
+        $plan = SubscriptionPlan::create([
+            'name' => 'Premium',
+            'slug' => 'premium',
+            'level' => 1,
+            'price_monthly' => 999,
+            'is_active' => true,
+            'sort_order' => 1,
+        ]);
+        Subscription::create([
+            'user_id' => $this->user->id,
+            'subscription_plan_id' => $plan->id,
+            'billing_cycle' => 'monthly',
+            'price_paid' => 999,
+            'starts_at' => now(),
+            'ends_at' => now()->addMonth(),
+            'status' => 'active',
+        ]);
+
         $this->coinService = app(CoinService::class);
     }
 
@@ -92,6 +114,28 @@ class MomentTest extends TestCase
         ]);
 
         $response->assertStatus(401);
+    }
+
+    /**
+     * Test free-plan users cannot upload moments.
+     */
+    public function test_free_plan_user_cannot_upload_moment(): void
+    {
+        $freeUser = User::factory()->create([
+            'storage_limit_mb' => 512,
+            'storage_used_bytes' => 0,
+        ]);
+
+        $video = UploadedFile::fake()->create('video.mp4', 1024 * 5); // 5MB
+
+        $response = $this->actingAs($freeUser, 'sanctum')
+            ->postJson('/api/v1/moments', [
+                'video' => $video,
+                'title' => 'Free User Moment',
+            ]);
+
+        $response->assertStatus(403)
+            ->assertJsonPath('error_type', 'plan_required');
     }
 
     /**

@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -35,6 +37,31 @@ class AuthTest extends TestCase
             'email' => 'test@example.com',
             'username' => 'testuser',
             'role' => 'user',
+        ]);
+    }
+
+    public function test_registration_assigns_free_subscription(): void
+    {
+        // Create a Free plan so the auto-assign logic has something to find
+        $freePlan = SubscriptionPlan::create([
+            'name' => 'Free', 'slug' => 'free', 'level' => 0,
+            'price_monthly' => 0, 'is_active' => true, 'sort_order' => 0,
+        ]);
+
+        $this->postJson('/api/v1/auth/register', [
+            'email' => 'newuser@example.com',
+            'username' => 'newuser',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ])->assertStatus(201);
+
+        $user = User::where('email', 'newuser@example.com')->firstOrFail();
+
+        $this->assertDatabaseHas('subscriptions', [
+            'user_id' => $user->id,
+            'subscription_plan_id' => $freePlan->id,
+            'status' => 'active',
+            'price_paid' => '0.00',
         ]);
     }
 

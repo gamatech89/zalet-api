@@ -5,8 +5,11 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
+use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Services\FounderVerificationService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -35,6 +38,21 @@ class AuthController extends Controller
 
         // Create empty profile for the user
         $user->profile()->create([]);
+
+        // Auto-assign Free plan subscription
+        $freePlan = SubscriptionPlan::where('slug', 'free')->where('level', 0)->first();
+        if ($freePlan) {
+            Subscription::create([
+                'user_id'              => $user->id,
+                'subscription_plan_id' => $freePlan->id,
+                'billing_cycle'        => 'monthly',
+                'price_paid'           => 0,
+                'starts_at'            => Carbon::now(),
+                'ends_at'              => Carbon::now()->addYears(100),
+                'status'               => 'active',
+                'auto_renew'           => false,
+            ]);
+        }
 
         // Process legacy founder status (sets flag + credits bonus if applicable)
         $isFounder = $this->founderService->processRegistration($user);

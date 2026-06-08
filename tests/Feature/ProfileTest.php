@@ -156,7 +156,8 @@ class ProfileTest extends TestCase
 
     public function test_user_can_upload_avatar(): void
     {
-        Storage::fake('public');
+        $disk = config('filesystems.default');
+        Storage::fake($disk);
 
         $user = User::factory()->create();
         $user->profile()->create([]);
@@ -175,14 +176,14 @@ class ProfileTest extends TestCase
         // Verify file was stored
         $profile = $user->profile()->first();
         $this->assertNotNull($profile->avatar_url);
-        Storage::disk('public')->assertExists(
+        Storage::disk($disk)->assertExists(
             str_replace('/storage/', '', $profile->avatar_url)
         );
     }
 
     public function test_avatar_upload_fails_with_invalid_file_type(): void
     {
-        Storage::fake('public');
+        Storage::fake(config('filesystems.default'));
 
         $user = User::factory()->create();
         $user->profile()->create([]);
@@ -201,7 +202,7 @@ class ProfileTest extends TestCase
 
     public function test_avatar_upload_fails_with_large_file(): void
     {
-        Storage::fake('public');
+        Storage::fake(config('filesystems.default'));
 
         $user = User::factory()->create();
         $user->profile()->create([]);
@@ -221,7 +222,8 @@ class ProfileTest extends TestCase
 
     public function test_avatar_upload_replaces_old_avatar(): void
     {
-        Storage::fake('public');
+        $disk = config('filesystems.default');
+        Storage::fake($disk);
 
         $user = User::factory()->create();
         $user->profile()->create([
@@ -230,7 +232,7 @@ class ProfileTest extends TestCase
         $token = $user->createToken('test-token')->plainTextToken;
 
         // Create old avatar file
-        Storage::disk('public')->put('avatars/old-avatar.jpg', 'old content');
+        Storage::disk($disk)->put('avatars/old-avatar.jpg', 'old content');
 
         $file = UploadedFile::fake()->image('new-avatar.jpg', 200, 200);
 
@@ -242,6 +244,6 @@ class ProfileTest extends TestCase
         $response->assertStatus(200);
 
         // Old avatar should be deleted
-        Storage::disk('public')->assertMissing('avatars/old-avatar.jpg');
+        Storage::disk($disk)->assertMissing('avatars/old-avatar.jpg');
     }
 }

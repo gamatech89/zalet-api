@@ -71,7 +71,7 @@ class ProfileController extends Controller
 
         // Delete old avatar if exists
         if ($profile->avatar_url) {
-            $oldPath = ltrim(parse_url($profile->avatar_url, PHP_URL_PATH), '/');
+            $oldPath = ltrim(str_replace(Storage::url(''), '', $profile->avatar_url), '/');
             Storage::delete($oldPath);
         }
 
@@ -105,7 +105,7 @@ class ProfileController extends Controller
 
         // Delete old cover if exists
         if ($profile->cover_url) {
-            $oldPath = ltrim(parse_url($profile->cover_url, PHP_URL_PATH), '/');
+            $oldPath = ltrim(str_replace(Storage::url(''), '', $profile->cover_url), '/');
             Storage::delete($oldPath);
         }
 

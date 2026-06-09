@@ -44,7 +44,7 @@ class MediaService
             'type' => $type,
             'provider' => 'native',
             'url' => $path,
-            'title' => $title ?? $file->getClientOriginalName(),
+            'title' => $title ?: null,
             'description' => $description,
             'size_bytes' => $fileSize,
             'is_ppv' => $isPpv,

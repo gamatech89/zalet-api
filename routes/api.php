@@ -336,6 +336,9 @@ Route::prefix('v1')->group(function () {
                     Route::post('/read-all', [NotificationController::class, 'markAllRead']);
                 });
 
+                // Group discovery (all public groups + user's own groups)
+                Route::get('/groups', [ConversationController::class, 'groups']);
+
                 // Messaging (Sprint 4)
                 Route::prefix('conversations')->group(function () {
                     Route::get('/', [ConversationController::class, 'index']);

@@ -15,6 +15,47 @@ use Illuminate\Support\Str;
 class ConversationController extends Controller
 {
     /**
+     * Discover groups: all public groups + groups the user is already in.
+     * GET /api/v1/groups
+     */
+    public function groups(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $groups = Conversation::where('is_group', true)
+            ->where(function ($q) use ($user) {
+                // Public groups anyone can discover, plus private groups the user is in
+                $q->where('is_public', true)
+                    ->orWhereHas('users', fn ($q2) => $q2->where('users.id', $user->id));
+            })
+            ->withCount('users as member_count')
+            ->orderByDesc('updated_at')
+            ->paginate(30);
+
+        return response()->json([
+            'data' => $groups->map(function ($group) use ($user) {
+                $membership = $group->users()->where('users.id', $user->id)->first();
+                return [
+                    'id' => $group->id,
+                    'name' => $group->name,
+                    'is_public' => $group->is_public,
+                    'member_count' => $group->member_count,
+                    'is_member' => $membership !== null,
+                    'my_role' => $membership?->pivot?->role,
+                    'invite_code' => $group->is_public ? $group->invite_code : null,
+                    'updated_at' => $group->updated_at->toIso8601String(),
+                ];
+            }),
+            'meta' => [
+                'current_page' => $groups->currentPage(),
+                'last_page' => $groups->lastPage(),
+                'per_page' => $groups->perPage(),
+                'total' => $groups->total(),
+            ],
+        ]);
+    }
+
+    /**
      * List user's conversations.
      * GET /api/v1/conversations
      */

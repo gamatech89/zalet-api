@@ -6,17 +6,11 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class CreateConversationRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     */
     public function rules(): array
     {
         return [
@@ -24,12 +18,10 @@ class CreateConversationRequest extends FormRequest
             'user_ids.*' => ['uuid', 'exists:users,id'],
             'name' => ['nullable', 'string', 'max:100'],
             'is_group' => ['boolean'],
+            'is_public' => ['boolean'],
         ];
     }
 
-    /**
-     * Get custom messages for validator errors.
-     */
     public function messages(): array
     {
         return [

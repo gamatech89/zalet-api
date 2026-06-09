@@ -338,14 +338,26 @@ Route::prefix('v1')->group(function () {
 
                 // Messaging (Sprint 4)
                 Route::prefix('conversations')->group(function () {
-                    Route::get('/', [ConversationController::class , 'index']);
-                    Route::post('/', [ConversationController::class , 'store']);
+                    Route::get('/', [ConversationController::class, 'index']);
+                    Route::post('/', [ConversationController::class, 'store']);
                     Route::get('/unread-count', [ConversationController::class, 'unreadCount']);
-                    Route::get('/{conversation}', [ConversationController::class , 'show']);
-                    Route::get('/{conversation}/messages', [MessageController::class , 'index']);
-                    Route::post('/{conversation}/messages', [MessageController::class , 'store']);
-                    Route::post('/{conversation}/messages/{message}/reactions', [MessageController::class , 'addReaction']);
-                    Route::post('/{conversation}/typing', [MessageController::class , 'typing']);
+                    // /join/{inviteCode} must come before /{conversation} to avoid UUID binding collision
+                    Route::get('/join/{inviteCode}', [ConversationController::class, 'joinByCode']);
+                    Route::get('/{conversation}', [ConversationController::class, 'show']);
+                    Route::patch('/{conversation}', [ConversationController::class, 'update']);
+                    Route::get('/{conversation}/messages', [MessageController::class, 'index']);
+                    Route::post('/{conversation}/messages', [MessageController::class, 'store']);
+                    Route::post('/{conversation}/messages/{message}/reactions', [MessageController::class, 'addReaction']);
+                    Route::post('/{conversation}/typing', [MessageController::class, 'typing']);
+                    // Group member management
+                    Route::post('/{conversation}/members', [ConversationController::class, 'addMembers']);
+                    Route::delete('/{conversation}/members/{member}', [ConversationController::class, 'kickMember']);
+                    Route::patch('/{conversation}/members/{member}/role', [ConversationController::class, 'updateMemberRole']);
+                    // Group ban management
+                    Route::post('/{conversation}/bans', [ConversationController::class, 'banMember']);
+                    Route::delete('/{conversation}/bans/{member}', [ConversationController::class, 'unbanMember']);
+                    // Leave group
+                    Route::delete('/{conversation}/leave', [ConversationController::class, 'leave']);
                 });
 
                 // Admin Routes (Sprint 5)

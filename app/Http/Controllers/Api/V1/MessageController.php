@@ -65,8 +65,8 @@ class MessageController extends Controller
         // Handle file upload
         if ($request->hasFile('media')) {
             $file = $request->file('media');
-            $path = $file->store('chat-media/' . $conversation->id, 'public');
-            $data['media_url'] = Storage::disk('public')->url($path);
+            $path = $file->store('chat-media/' . $conversation->id, 's3');
+            $data['media_url'] = Storage::disk('s3')->url($path);
 
             // Determine message type from MIME
             $mime = $file->getMimeType();

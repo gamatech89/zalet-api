@@ -337,7 +337,7 @@ class RaiffeisenPaymentService
 
             // Auto-save card if UPCToken is present in response
             if (!empty($data['UPCToken'])) {
-                $this->saveCardFromWebhook($data, $transaction->fromWallet?->user_id ?? '');
+                $this->saveCardFromWebhook($data, $transaction->toWallet?->user_id ?? '');
             }
 
             Log::info('Deposit confirmed via webhook', [

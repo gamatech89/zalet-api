@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             GiftSeeder::class,
             MediaSeeder::class,
             GeoNamesSeeder::class,
+            AchievementSeeder::class,
         ]);
 
         $this->command->info('Database seeding completed!');

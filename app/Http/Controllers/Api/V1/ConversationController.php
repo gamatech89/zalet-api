@@ -63,7 +63,7 @@ class ConversationController extends Controller
     {
         $conversations = $request->user()
             ->conversations()
-            ->with(['latestMessage:id,conversation_id,sender_id,content,message_type,created_at', 'latestMessage.sender:id,username', 'users:id,username'])
+            ->with(['latestMessage.sender:id,username', 'users:id,username'])
             ->withCount('messages')
             ->orderBy('updated_at', 'desc')
             ->paginate(20);

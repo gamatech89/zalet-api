@@ -10,6 +10,7 @@ use App\Http\Requests\SendMessageRequest;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\MessageReaction;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -92,10 +93,81 @@ class MessageController extends Controller
         // Broadcast message to other participants
         broadcast(new MessageSentEvent($message))->toOthers();
 
+        // Parse @mentions and notify mentioned participants
+        if ($request->content && preg_match_all('/@([\w]+)/', $request->content, $matches)) {
+            $mentionedUsernames = array_unique($matches[1]);
+            $participantIds = $conversation->users()->pluck('users.id')->toArray();
+            $senderId = $request->user()->id;
+
+            foreach ($mentionedUsernames as $username) {
+                $mentioned = \App\Models\User::where('username', $username)
+                    ->whereIn('id', $participantIds)
+                    ->where('id', '!=', $senderId)
+                    ->first();
+
+                if ($mentioned) {
+                    app(NotificationService::class)->create(
+                        $mentioned,
+                        'mention',
+                        '@' . $request->user()->username . ' te je pomenuo/la',
+                        \Illuminate\Support\Str::limit($request->content, 80),
+                        [
+                            'conversation_id' => $conversation->id,
+                            'message_id'      => $message->id,
+                            'sender_username' => $request->user()->username,
+                        ]
+                    );
+                }
+            }
+        }
+
         return response()->json([
             'message' => 'Message sent successfully.',
             'data' => $this->formatMessage($message),
         ], 201);
+    }
+
+    /**
+     * Get messages around a specific message (for mention deep-linking).
+     * GET /api/v1/conversations/{conversation}/messages/around/{message}
+     */
+    public function around(Request $request, Conversation $conversation, Message $message): JsonResponse
+    {
+        Gate::authorize('view', $conversation);
+
+        if ($message->conversation_id !== $conversation->id) {
+            return response()->json(['message' => 'Message not found in this conversation.'], 404);
+        }
+
+        $limit = 25;
+
+        $before = $conversation->messages()
+            ->with(['sender:id,username', 'reactions.user:id,username', 'repliedTo.sender:id,username'])
+            ->where('created_at', '<=', $message->created_at)
+            ->where('id', '!=', $message->id)
+            ->orderBy('created_at', 'desc')
+            ->limit($limit)
+            ->get()
+            ->reverse()
+            ->values();
+
+        $after = $conversation->messages()
+            ->with(['sender:id,username', 'reactions.user:id,username', 'repliedTo.sender:id,username'])
+            ->where('created_at', '>', $message->created_at)
+            ->orderBy('created_at', 'asc')
+            ->limit($limit)
+            ->get();
+
+        $message->load(['sender:id,username', 'reactions.user:id,username', 'repliedTo.sender:id,username']);
+
+        $all = $before->concat([$message])->concat($after);
+
+        return response()->json([
+            'data' => $all->map(fn($m) => $this->formatMessage($m)),
+            'target_message_id' => $message->id,
+            'has_before' => $before->count() === $limit,
+            'has_after' => $after->count() === $limit,
+        ]);
     }
 
     /**

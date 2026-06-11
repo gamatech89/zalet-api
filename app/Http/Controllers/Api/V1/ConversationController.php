@@ -63,7 +63,7 @@ class ConversationController extends Controller
     {
         $conversations = $request->user()
             ->conversations()
-            ->with(['latestMessage.sender:id,username', 'users:id,username', 'board:id,name,slug,image_url'])
+            ->with(['latestMessage.sender:id,username', 'users:id,username,name', 'board:id,name,slug,image_url'])
             ->withCount('messages')
             ->orderBy('updated_at', 'desc')
             ->paginate(20);
@@ -207,7 +207,7 @@ class ConversationController extends Controller
     {
         Gate::authorize('view', $conversation);
 
-        $conversation->load(['users']);
+        $conversation->load(['users:id,username,name']);
 
         $myUser = $conversation->users->firstWhere('id', $request->user()->id);
 
@@ -546,7 +546,7 @@ class ConversationController extends Controller
         }
 
         $otherUser = $conversation->users->firstWhere('id', '!=', $currentUser->id);
-        return $otherUser?->username ?? 'Unknown';
+        return $otherUser?->name ?? $otherUser?->username ?? 'Unknown';
     }
 
     private function getUserRole(User $user, Conversation $conversation): ?string

@@ -19,10 +19,12 @@ class Message extends Model
         'message_type',
         'media_url',
         'reply_to_id',
+        'edited_at',
     ];
 
     protected $casts = [
         'message_type' => 'string',
+        'edited_at' => 'datetime',
     ];
 
     public function conversation(): BelongsTo

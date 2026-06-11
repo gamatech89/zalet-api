@@ -351,6 +351,7 @@ Route::prefix('v1')->group(function () {
                     Route::get('/{conversation}/messages', [MessageController::class, 'index']);
                     Route::post('/{conversation}/messages', [MessageController::class, 'store']);
                     Route::get('/{conversation}/messages/around/{message}', [MessageController::class, 'around']);
+                    Route::patch('/{conversation}/messages/{message}', [MessageController::class, 'update']);
                     Route::post('/{conversation}/messages/{message}/reactions', [MessageController::class, 'addReaction']);
                     Route::post('/{conversation}/typing', [MessageController::class, 'typing']);
                     // Group member management

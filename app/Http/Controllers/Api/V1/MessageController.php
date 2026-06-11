@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Events\MessageEditedEvent;
 use App\Events\MessageReadEvent;
 use App\Events\MessageSentEvent;
 use App\Events\UserTypingEvent;
@@ -27,7 +28,7 @@ class MessageController extends Controller
         Gate::authorize('view', $conversation);
 
         $messages = $conversation->messages()
-            ->with(['sender:id,username', 'reactions.user:id,username', 'repliedTo.sender:id,username'])
+            ->with(['sender:id,username', 'sender.profile:user_id,avatar_url', 'reactions.user:id,username', 'repliedTo.sender:id,username'])
             ->orderBy('created_at', 'desc')
             ->paginate(50);
 
@@ -85,7 +86,7 @@ class MessageController extends Controller
         }
 
         $message = $conversation->messages()->create($data);
-        $message->load(['sender:id,username', 'reactions', 'repliedTo.sender:id,username']);
+        $message->load(['sender:id,username', 'sender.profile:user_id,avatar_url', 'reactions', 'repliedTo.sender:id,username']);
 
         // Update conversation timestamp
         $conversation->touch();
@@ -128,6 +129,41 @@ class MessageController extends Controller
     }
 
     /**
+     * Edit a message (sender only, text messages only).
+     * PATCH /api/v1/conversations/{conversation}/messages/{message}
+     */
+    public function update(Request $request, Conversation $conversation, Message $message): JsonResponse
+    {
+        Gate::authorize('view', $conversation);
+
+        if ($message->conversation_id !== $conversation->id) {
+            return response()->json(['message' => 'Message not found in this conversation.'], 404);
+        }
+        if ($message->sender_id !== $request->user()->id) {
+            return response()->json(['message' => 'You can only edit your own messages.'], 403);
+        }
+        if ($message->message_type !== 'text') {
+            return response()->json(['message' => 'Only text messages can be edited.'], 422);
+        }
+
+        $validated = $request->validate([
+            'content' => ['required', 'string', 'max:5000'],
+        ]);
+
+        $message->update([
+            'content' => $validated['content'],
+            'edited_at' => now(),
+        ]);
+
+        broadcast(new MessageEditedEvent($message))->toOthers();
+
+        return response()->json([
+            'message' => 'Message updated.',
+            'data' => $this->formatMessage($message),
+        ]);
+    }
+
+    /**
      * Get messages around a specific message (for mention deep-linking).
      * GET /api/v1/conversations/{conversation}/messages/around/{message}
      */
@@ -142,7 +178,7 @@ class MessageController extends Controller
         $limit = 25;
 
         $before = $conversation->messages()
-            ->with(['sender:id,username', 'reactions.user:id,username', 'repliedTo.sender:id,username'])
+            ->with(['sender:id,username', 'sender.profile:user_id,avatar_url', 'reactions.user:id,username', 'repliedTo.sender:id,username'])
             ->where('created_at', '<=', $message->created_at)
             ->where('id', '!=', $message->id)
             ->orderBy('created_at', 'desc')
@@ -152,7 +188,7 @@ class MessageController extends Controller
             ->values();
 
         $after = $conversation->messages()
-            ->with(['sender:id,username', 'reactions.user:id,username', 'repliedTo.sender:id,username'])
+            ->with(['sender:id,username', 'sender.profile:user_id,avatar_url', 'reactions.user:id,username', 'repliedTo.sender:id,username'])
             ->where('created_at', '>', $message->created_at)
             ->orderBy('created_at', 'asc')
             ->limit($limit)
@@ -246,6 +282,7 @@ class MessageController extends Controller
             'sender' => [
                 'id' => $message->sender->id,
                 'username' => $message->sender->username,
+                'avatar_url' => $message->sender->profile?->avatar_url,
             ],
             'reactions' => $this->formatReactions($message),
             'reply_to' => $message->repliedTo ? [
@@ -258,6 +295,7 @@ class MessageController extends Controller
                 ],
             ] : null,
             'created_at' => $message->created_at->toIso8601String(),
+            'edited_at' => $message->edited_at?->toIso8601String(),
         ];
     }
 

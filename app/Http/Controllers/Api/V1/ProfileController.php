@@ -41,11 +41,16 @@ class ProfileController extends Controller
     public function update(UpdateProfileRequest $request): JsonResponse
     {
         $user = $request->user();
-        
+
         // Ensure profile exists
         $profile = $user->profile ?? $user->profile()->create([]);
 
         $profile->update($request->validated());
+
+        // Update display name on user if provided
+        if ($request->has('name')) {
+            $user->update(['name' => $request->input('name')]);
+        }
 
         return response()->json([
             'message' => 'Profile updated successfully.',

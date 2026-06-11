@@ -361,6 +361,7 @@ Route::prefix('v1')->group(function () {
                     Route::delete('/{conversation}/bans/{member}', [ConversationController::class, 'unbanMember']);
                     // Leave group
                     Route::delete('/{conversation}/leave', [ConversationController::class, 'leave']);
+                    Route::post('/{conversation}/read', [ConversationController::class, 'markRead']);
                 });
 
                 // Admin Routes (Sprint 5)

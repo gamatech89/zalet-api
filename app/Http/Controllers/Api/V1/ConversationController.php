@@ -68,21 +68,34 @@ class ConversationController extends Controller
             ->orderBy('updated_at', 'desc')
             ->paginate(20);
 
+        $userId = $request->user()->id;
+
         return response()->json([
-            'data' => $conversations->map(function ($conversation) use ($request) {
-                $myUser = $conversation->users->firstWhere('id', $request->user()->id);
+            'data' => $conversations->map(function ($conversation) use ($request, $userId) {
+                $myUser = $conversation->users->firstWhere('id', $userId);
+                $lastReadAt = $myUser?->pivot?->last_read_at;
+
+                $unreadCount = $conversation->messages()
+                    ->where('sender_id', '!=', $userId)
+                    ->when($lastReadAt, fn ($q) => $q->where('created_at', '>', $lastReadAt))
+                    ->limit(99)
+                    ->count();
+
                 return [
                     'id' => $conversation->id,
                     'name' => $conversation->name ?? $this->getConversationName($conversation, $request->user()),
                     'is_group' => $conversation->is_group,
                     'is_public' => $conversation->is_public,
                     'my_role' => $myUser?->pivot?->role,
+                    'last_read_at' => $lastReadAt?->toIso8601String(),
+                    'unread_count' => $unreadCount,
                     'participants' => $conversation->users->map(fn ($u) => [
                         'id' => $u->id,
                         'username' => $u->username,
                     ]),
                     'last_message' => $conversation->latestMessage ? [
                         'content' => $conversation->latestMessage->content,
+                        'message_type' => $conversation->latestMessage->message_type,
                         'sender' => $conversation->latestMessage->sender->username,
                         'sent_at' => $conversation->latestMessage->created_at->toIso8601String(),
                     ] : null,
@@ -203,6 +216,7 @@ class ConversationController extends Controller
                 'is_public' => $conversation->is_public,
                 'invite_code' => $conversation->is_public ? $conversation->invite_code : null,
                 'my_role' => $myUser?->pivot?->role,
+                'last_read_at' => $myUser?->pivot?->last_read_at?->toIso8601String(),
                 'participants' => $conversation->users->map(fn ($u) => [
                     'id' => $u->id,
                     'username' => $u->username,
@@ -211,6 +225,21 @@ class ConversationController extends Controller
                 'created_at' => $conversation->created_at->toIso8601String(),
             ],
         ]);
+    }
+
+    /**
+     * Mark all messages in a conversation as read.
+     * POST /api/v1/conversations/{conversation}/read
+     */
+    public function markRead(Request $request, Conversation $conversation): JsonResponse
+    {
+        Gate::authorize('view', $conversation);
+
+        $conversation->users()->updateExistingPivot($request->user()->id, [
+            'last_read_at' => now(),
+        ]);
+
+        return response()->json(['success' => true]);
     }
 
     /**

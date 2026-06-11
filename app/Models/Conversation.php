@@ -30,8 +30,7 @@ class Conversation extends Model
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class)
-            ->withPivot('joined_at', 'last_read_at', 'role')
-            ->withPivotCasts(['joined_at' => 'datetime', 'last_read_at' => 'datetime']);
+            ->withPivot('joined_at', 'last_read_at', 'role');
     }
 
     public function messages(): HasMany

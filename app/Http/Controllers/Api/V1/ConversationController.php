@@ -87,7 +87,7 @@ class ConversationController extends Controller
                     'is_group' => $conversation->is_group,
                     'is_public' => $conversation->is_public,
                     'my_role' => $myUser?->pivot?->role,
-                    'last_read_at' => $lastReadAt?->toIso8601String(),
+                    'last_read_at' => $lastReadAt ? now()->parse($lastReadAt)->toIso8601String() : null,
                     'unread_count' => $unreadCount,
                     'participants' => $conversation->users->map(fn ($u) => [
                         'id' => $u->id,
@@ -216,7 +216,7 @@ class ConversationController extends Controller
                 'is_public' => $conversation->is_public,
                 'invite_code' => $conversation->is_public ? $conversation->invite_code : null,
                 'my_role' => $myUser?->pivot?->role,
-                'last_read_at' => $myUser?->pivot?->last_read_at?->toIso8601String(),
+                'last_read_at' => ($lr = $myUser?->pivot?->last_read_at) ? now()->parse($lr)->toIso8601String() : null,
                 'participants' => $conversation->users->map(fn ($u) => [
                     'id' => $u->id,
                     'username' => $u->username,

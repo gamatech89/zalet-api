@@ -9,11 +9,13 @@ class ConversationPolicy
 {
     public function view(User $user, Conversation $conversation): bool
     {
+        if ($user->role === 'admin' && $conversation->is_group) return true;
         return $conversation->users()->where('users.id', $user->id)->exists();
     }
 
     public function sendMessage(User $user, Conversation $conversation): bool
     {
+        if ($user->role === 'admin' && $conversation->is_group) return true;
         return $conversation->users()->where('users.id', $user->id)->exists();
     }
 

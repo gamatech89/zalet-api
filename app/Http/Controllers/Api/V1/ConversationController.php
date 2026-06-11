@@ -63,7 +63,7 @@ class ConversationController extends Controller
     {
         $conversations = $request->user()
             ->conversations()
-            ->with(['latestMessage.sender:id,username', 'users:id,username'])
+            ->with(['latestMessage.sender:id,username', 'users:id,username', 'board:id,name,slug,image_url'])
             ->withCount('messages')
             ->orderBy('updated_at', 'desc')
             ->paginate(20);
@@ -101,6 +101,9 @@ class ConversationController extends Controller
                     ] : null,
                     'messages_count' => $conversation->messages_count,
                     'updated_at' => $conversation->updated_at->toIso8601String(),
+                    'board_slug' => $conversation->board?->slug,
+                    'board_name' => $conversation->board?->name,
+                    'board_image_url' => $conversation->board?->image_url,
                 ];
             }),
             'meta' => [

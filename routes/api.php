@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\V1\SubscriptionController;
 use App\Http\Controllers\Api\V1\SubscriptionPlanController;
 use App\Http\Controllers\Api\V1\CreatorRequestController;
 use App\Http\Controllers\Api\V1\WalletController;
+use App\Http\Controllers\Api\V1\AchievementTestController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use Illuminate\Support\Facades\Route;
 
@@ -51,6 +52,9 @@ Route::prefix('v1')->group(function () {
      | Public Routes (No Authentication Required)
      |--------------------------------------------------------------------------
      */
+
+    // Achievement test endpoint (dev only)
+    Route::post('/test/achievement', [AchievementTestController::class, 'trigger']);
 
     // Health check
     Route::get('/health', function () {

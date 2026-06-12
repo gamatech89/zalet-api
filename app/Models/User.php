@@ -10,6 +10,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use App\Models\UserEvent;
+use App\Models\UserAchievement;
+use App\Models\Achievement;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -105,6 +108,31 @@ class User extends Authenticatable implements FilamentUser, HasName
     public function creatorRequests(): HasMany
     {
         return $this->hasMany(CreatorRequest::class);
+    }
+
+    public function userEvents(): HasMany
+    {
+        return $this->hasMany(UserEvent::class);
+    }
+
+    public function userAchievements(): HasMany
+    {
+        return $this->hasMany(UserAchievement::class);
+    }
+
+    public function earnedAchievements(): BelongsToMany
+    {
+        return $this->belongsToMany(Achievement::class, 'user_achievements')
+            ->whereNotNull('user_achievements.earned_at')
+            ->withPivot('progress', 'earned_at')
+            ->withTimestamps();
+    }
+
+    public function achievements(): BelongsToMany
+    {
+        return $this->belongsToMany(Achievement::class, 'user_achievements')
+            ->withPivot('progress', 'earned_at')
+            ->withTimestamps();
     }
 
     // === Subscription Helpers ===

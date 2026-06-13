@@ -31,6 +31,8 @@ use App\Http\Controllers\Api\V1\SubscriptionPlanController;
 use App\Http\Controllers\Api\V1\CreatorRequestController;
 use App\Http\Controllers\Api\V1\WalletController;
 use App\Http\Controllers\Api\V1\NotificationController;
+use App\Http\Controllers\Api\V1\BlockController;
+use App\Http\Controllers\Api\V1\ReportController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -366,6 +368,17 @@ Route::prefix('v1')->group(function () {
                     Route::post('/{conversation}/read', [ConversationController::class, 'markRead']);
                 });
 
+                // Blocks
+                Route::prefix('blocks')->group(function () {
+                    Route::get('/', [BlockController::class, 'index']);
+                    Route::post('/', [BlockController::class, 'store']);
+                    Route::get('/{user}', [BlockController::class, 'check']);
+                    Route::delete('/{user}', [BlockController::class, 'destroy']);
+                });
+
+                // Reports
+                Route::post('/reports', [ReportController::class, 'store']);
+
                 // Admin Routes (Sprint 5)
                 Route::prefix('admin')
                     ->middleware('admin')
@@ -392,6 +405,10 @@ Route::prefix('v1')->group(function () {
                 Route::put('/gifts/{gift}', [AdminGiftController::class, 'update']);
                 Route::delete('/gifts/{gift}', [AdminGiftController::class, 'destroy']);
                 Route::post('/gifts/{gift}/icon', [AdminGiftController::class, 'uploadIcon']);
+
+                // Reports
+                Route::get('/reports', [ReportController::class, 'adminIndex']);
+                Route::patch('/reports/{report}', [ReportController::class, 'adminUpdate']);
 
                 // Gift Categories
                 Route::get('/gift-categories', [AdminGiftController::class, 'categories']);

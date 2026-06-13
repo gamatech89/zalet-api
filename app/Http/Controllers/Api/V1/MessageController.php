@@ -8,6 +8,7 @@ use App\Events\MessageSentEvent;
 use App\Events\UserTypingEvent;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SendMessageRequest;
+use App\Models\Block;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\MessageReaction;
@@ -27,8 +28,12 @@ class MessageController extends Controller
     {
         Gate::authorize('view', $conversation);
 
+        $blockedIds = Block::where('blocker_id', $request->user()->id)
+            ->pluck('blocked_id');
+
         $messages = $conversation->messages()
             ->with(['sender:id,username', 'sender.profile:user_id,avatar_url', 'reactions.user:id,username', 'repliedTo.sender:id,username'])
+            ->when($blockedIds->isNotEmpty(), fn($q) => $q->whereNotIn('sender_id', $blockedIds))
             ->orderBy('created_at', 'desc')
             ->paginate(50);
 

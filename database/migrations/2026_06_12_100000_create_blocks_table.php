@@ -10,8 +10,8 @@ return new class extends Migration
     {
         Schema::create('blocks', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('blocker_id')->constrained('users')->cascadeOnDelete();
-            $table->foreignId('blocked_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignUuid('blocker_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignUuid('blocked_id')->constrained('users')->cascadeOnDelete();
             $table->timestamps();
 
             $table->unique(['blocker_id', 'blocked_id']);

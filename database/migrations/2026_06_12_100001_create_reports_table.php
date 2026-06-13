@@ -10,8 +10,8 @@ return new class extends Migration
     {
         Schema::create('reports', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('reporter_id')->constrained('users')->cascadeOnDelete();
-            $table->foreignId('reported_user_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignUuid('reporter_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignUuid('reported_user_id')->constrained('users')->cascadeOnDelete();
             $table->string('reason');
             $table->text('description');
             $table->string('evidence_url')->nullable();

@@ -14,15 +14,9 @@
           {{-- Logo / Header --}}
           <tr>
             <td align="center" style="padding-bottom:32px;">
-              <table cellpadding="0" cellspacing="0">
-                <tr>
-                  <td style="background:linear-gradient(135deg,#e63946,#c1121f);border-radius:16px;width:56px;height:56px;text-align:center;vertical-align:middle;">
-                    <span style="color:#fff;font-size:28px;font-weight:900;line-height:56px;display:block;">Z</span>
-                  </td>
-                </tr>
-              </table>
+              <img src="https://zaletyu.com/icons/icon-192.png" alt="Zalet" width="64" height="64" style="display:block;margin:0 auto;border-radius:16px;" />
               <p style="margin:12px 0 0;color:#fff;font-size:22px;font-weight:800;letter-spacing:0.15em;">ZALET</p>
-              <p style="margin:4px 0 0;color:#666;font-size:12px;letter-spacing:0.08em;">ZAJETNICA DIJASPORE</p>
+              <p style="margin:4px 0 0;color:#666;font-size:12px;letter-spacing:0.08em;">POSTANI DEO EKIPE</p>
             </td>
           </tr>
 

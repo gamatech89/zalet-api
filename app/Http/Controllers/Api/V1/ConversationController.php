@@ -92,6 +92,7 @@ class ConversationController extends Controller
                     'participants' => $conversation->users->map(fn ($u) => [
                         'id' => $u->id,
                         'username' => $u->username,
+                        'name' => $u->name,
                     ]),
                     'last_message' => $conversation->latestMessage ? [
                         'content' => $conversation->latestMessage->content,
@@ -223,6 +224,7 @@ class ConversationController extends Controller
                 'participants' => $conversation->users->map(fn ($u) => [
                     'id' => $u->id,
                     'username' => $u->username,
+                    'name' => $u->name,
                     'role' => $u->pivot?->role,
                 ]),
                 'created_at' => $conversation->created_at->toIso8601String(),

@@ -10,6 +10,7 @@ use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Services\FounderVerificationService;
 use Carbon\Carbon;
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -54,6 +55,9 @@ class AuthController extends Controller
             ]);
         }
 
+        // Send email verification notification
+        $user->sendEmailVerificationNotification();
+
         // Process legacy founder status (sets flag + credits bonus if applicable)
         $isFounder = $this->founderService->processRegistration($user);
 
@@ -96,6 +100,45 @@ class AuthController extends Controller
             'user' => $user->load('profile', 'wallet'),
             'token' => $token,
         ]);
+    }
+
+    /**
+     * Verify email address via signed link from email.
+     * GET /api/v1/auth/verify-email/{id}/{hash}
+     */
+    public function verifyEmail(Request $request, string $id, string $hash): \Illuminate\Http\RedirectResponse
+    {
+        $frontendUrl = rtrim(env('FRONTEND_URL', 'https://zaletyu.com'), '/');
+
+        $user = User::findOrFail($id);
+
+        if (!hash_equals(sha1($user->getEmailForVerification()), $hash)) {
+            return redirect("{$frontendUrl}/verify-email?error=invalid");
+        }
+
+        if ($user->hasVerifiedEmail()) {
+            return redirect("{$frontendUrl}/verify-email?already=1");
+        }
+
+        $user->markEmailAsVerified();
+        event(new Verified($user));
+
+        return redirect("{$frontendUrl}/verify-email?success=1");
+    }
+
+    /**
+     * Resend email verification notification.
+     * POST /api/v1/auth/verify-email/resend
+     */
+    public function resendVerification(Request $request): JsonResponse
+    {
+        if ($request->user()->hasVerifiedEmail()) {
+            return response()->json(['message' => 'Email je već verifikovan.'], 422);
+        }
+
+        $request->user()->sendEmailVerificationNotification();
+
+        return response()->json(['message' => 'Verifikacioni email je ponovo poslat.']);
     }
 
     /**

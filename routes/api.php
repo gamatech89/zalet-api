@@ -69,8 +69,15 @@ Route::prefix('v1')->group(function () {
             Route::post('/register', [AuthController::class , 'register']);
             Route::post('/login', [AuthController::class , 'login']);
             Route::post('/forgot-password', [AuthController::class , 'forgotPassword']);
-        }
-        );
+            // Email verification (signed URL — no auth required, link comes from email)
+            Route::get('/verify-email/{id}/{hash}', [AuthController::class , 'verifyEmail'])
+                ->middleware('signed')
+                ->name('verification.verify');
+        });
+
+        // Resend verification (requires auth, not verified)
+        Route::post('/auth/verify-email/resend', [AuthController::class , 'resendVerification'])
+            ->middleware('auth:sanctum');
 
         // Gift catalog (public - anyone can view) - moderate rate limiting
         Route::get('/gifts', [GiftController::class , 'index'])->middleware('throttle:public');

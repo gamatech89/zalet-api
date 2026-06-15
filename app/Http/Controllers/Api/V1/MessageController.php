@@ -31,11 +31,18 @@ class MessageController extends Controller
         $blockedIds = Block::where('blocker_id', $request->user()->id)
             ->pluck('blocked_id');
 
-        $messages = $conversation->messages()
+        $query = $conversation->messages()
             ->with(['sender:id,username,name', 'sender.profile:user_id,avatar_url', 'reactions.user:id,username', 'repliedTo.sender:id,username,name'])
-            ->when($blockedIds->isNotEmpty(), fn($q) => $q->whereNotIn('sender_id', $blockedIds))
-            ->orderBy('created_at', 'desc')
-            ->paginate(50);
+            ->when($blockedIds->isNotEmpty(), fn($q) => $q->whereNotIn('sender_id', $blockedIds));
+
+        if ($request->filled('before_id')) {
+            $pivot = Message::find($request->before_id);
+            if ($pivot) {
+                $query->where('created_at', '<', $pivot->created_at);
+            }
+        }
+
+        $messages = $query->orderBy('created_at', 'desc')->paginate(50);
 
         // Update last_read_at and broadcast read receipt to the other participant
         $now = now();

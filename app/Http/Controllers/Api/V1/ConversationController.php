@@ -481,6 +481,36 @@ class ConversationController extends Controller
     }
 
     /**
+     * Get public group info by invite code without joining.
+     * GET /api/v1/conversations/invite/{inviteCode}
+     */
+    public function groupInfo(Request $request, string $inviteCode): JsonResponse
+    {
+        $conversation = Conversation::where('invite_code', $inviteCode)
+            ->where('is_public', true)
+            ->where('is_group', true)
+            ->withCount('users')
+            ->first();
+
+        if (!$conversation) {
+            return response()->json(['message' => 'Invalid or expired invite link.'], 404);
+        }
+
+        $isMember = $conversation->users()->where('users.id', $request->user()->id)->exists();
+
+        return response()->json([
+            'data' => [
+                'id' => $conversation->id,
+                'name' => $conversation->name,
+                'description' => $conversation->description ?? null,
+                'member_count' => $conversation->users_count,
+                'invite_code' => $conversation->invite_code,
+                'is_member' => $isMember,
+            ],
+        ]);
+    }
+
+    /**
      * Join a public group via invite code.
      * GET /api/v1/conversations/join/{inviteCode}
      */

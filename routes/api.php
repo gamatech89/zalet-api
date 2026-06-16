@@ -353,7 +353,8 @@ Route::prefix('v1')->group(function () {
                     Route::get('/', [ConversationController::class, 'index']);
                     Route::post('/', [ConversationController::class, 'store']);
                     Route::get('/unread-count', [ConversationController::class, 'unreadCount']);
-                    // /join/{inviteCode} must come before /{conversation} to avoid UUID binding collision
+                    // Static prefixes must come before /{conversation} to avoid UUID binding collision
+                    Route::get('/invite/{inviteCode}', [ConversationController::class, 'groupInfo']);
                     Route::get('/join/{inviteCode}', [ConversationController::class, 'joinByCode']);
                     Route::get('/{conversation}', [ConversationController::class, 'show']);
                     Route::patch('/{conversation}', [ConversationController::class, 'update']);

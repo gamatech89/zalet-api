@@ -315,7 +315,7 @@ class LiveStreamController extends Controller
             $liveStream->id,
             $user,
             $request->input('message')
-        ))->toOthers();
+        ));
 
         return response()->json([
             'message' => 'Message sent.',

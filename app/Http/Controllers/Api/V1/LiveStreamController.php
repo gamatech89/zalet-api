@@ -383,12 +383,11 @@ class LiveStreamController extends Controller
         $file = $request->file('recording');
         $filename = 'stream-' . $liveStream->id . '-' . time() . '.' . $file->getClientOriginalExtension();
 
-        // Store on the recordings disk (local by default, S3-ready)
-        $path = $file->storeAs('streams/' . $liveStream->id, $filename, 'recordings');
+        $path = $file->storeAs('streams/' . $liveStream->id, $filename, 's3');
 
         $liveStream->update([
             'recording_url' => $path,
-            'recording_disk' => 'recordings',
+            'recording_disk' => 's3',
             'recording_duration' => $request->input('duration'),
             'recording_size' => $file->getSize(),
             'has_recording' => true,

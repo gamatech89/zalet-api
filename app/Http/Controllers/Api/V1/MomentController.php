@@ -35,7 +35,19 @@ class MomentController extends Controller
             ->paginate($request->input('per_page', 20));
 
         return response()->json([
-            'data' => $moments->items(),
+            'data' => collect($moments->items())->map(fn ($m) => [
+                'id' => $m->id,
+                'type' => $m->type,
+                'title' => $m->title,
+                'description' => $m->description,
+                'url' => $this->mediaService->getMediaUrl($m),
+                'thumbnail_url' => $m->thumbnail_url,
+                'is_ppv' => $m->is_ppv,
+                'price_coins' => $m->price_coins,
+                'access_level' => $m->access_level ?? 'public',
+                'user' => $m->user ? ['id' => $m->user->id, 'username' => $m->user->username] : null,
+                'created_at' => $m->created_at,
+            ]),
             'meta' => [
                 'current_page' => $moments->currentPage(),
                 'last_page' => $moments->lastPage(),

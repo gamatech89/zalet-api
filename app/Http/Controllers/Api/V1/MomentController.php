@@ -31,8 +31,19 @@ class MomentController extends Controller
             $query->where('user_id', $request->input('user_id'));
         }
 
+        $authUser = $request->user() ?? auth('sanctum')->user();
+
         $moments = $query->latest()
             ->paginate($request->input('per_page', 20));
+
+        $momentIds = collect($moments->items())->pluck('id')->all();
+        $likedIds = $authUser
+            ? \App\Models\MediaLike::where('user_id', $authUser->id)
+                ->whereIn('media_id', $momentIds)
+                ->pluck('media_id')
+                ->flip()
+                ->all()
+            : [];
 
         return response()->json([
             'data' => collect($moments->items())->map(fn ($m) => [
@@ -45,6 +56,8 @@ class MomentController extends Controller
                 'is_ppv' => $m->is_ppv,
                 'price_coins' => $m->price_coins,
                 'access_level' => $m->access_level ?? 'public',
+                'likes_count' => $m->likes_count ?? 0,
+                'is_liked' => isset($likedIds[$m->id]),
                 'user' => $m->user ? ['id' => $m->user->id, 'username' => $m->user->username] : null,
                 'created_at' => $m->created_at,
             ]),

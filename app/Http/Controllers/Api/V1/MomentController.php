@@ -25,7 +25,7 @@ class MomentController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Media::moments()->with('user:id,username');
+        $query = Media::moments()->with('user:id,username')->withCount('comments');
 
         if ($request->has('user_id')) {
             $query->where('user_id', $request->input('user_id'));
@@ -37,8 +37,10 @@ class MomentController extends Controller
             ->paginate($request->input('per_page', 20));
 
         $momentIds = collect($moments->items())->pluck('id')->all();
+        $creatorIds = collect($moments->items())->pluck('user_id')->unique()->values()->all();
         $likedIds = [];
         $bookmarkedIds = [];
+        $followingIds = [];
         if ($authUser) {
             $likedIds = \App\Models\MediaLike::where('user_id', $authUser->id)
                 ->whereIn('media_id', $momentIds)
@@ -48,6 +50,12 @@ class MomentController extends Controller
             $bookmarkedIds = \App\Models\MediaBookmark::where('user_id', $authUser->id)
                 ->whereIn('media_id', $momentIds)
                 ->pluck('media_id')
+                ->flip()
+                ->all();
+            $followingIds = \DB::table('follows')
+                ->where('follower_id', $authUser->id)
+                ->whereIn('following_id', $creatorIds)
+                ->pluck('following_id')
                 ->flip()
                 ->all();
         }
@@ -64,8 +72,10 @@ class MomentController extends Controller
                 'price_coins' => $m->price_coins,
                 'access_level' => $m->access_level ?? 'public',
                 'likes_count' => $m->likes_count ?? 0,
+                'comments_count' => $m->comments_count ?? 0,
                 'is_liked' => isset($likedIds[$m->id]),
                 'is_bookmarked' => isset($bookmarkedIds[$m->id]),
+                'is_following' => isset($followingIds[$m->user_id]),
                 'user' => $m->user ? ['id' => $m->user->id, 'username' => $m->user->username] : null,
                 'created_at' => $m->created_at,
             ]),

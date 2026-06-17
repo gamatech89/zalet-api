@@ -106,8 +106,8 @@ class MediaInteractionController extends Controller
             ->with(['media' => function ($q) {
                 $q->with('user:id,username')->select(
                     'id', 'user_id', 'type', 'title', 'description',
-                    'url', 'thumbnail_url', 'duration_seconds',
-                    'access_level', 'ppv_price', 'is_published',
+                    'url', 'thumbnail_url',
+                    'is_ppv', 'price_coins', 'access_level',
                     'views_count', 'likes_count', 'bookmarks_count', 'comments_count',
                     'created_at'
                 );

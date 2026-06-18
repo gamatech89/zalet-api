@@ -102,6 +102,7 @@ return [
         'portal_url' => env('RAIFFEISEN_PORTAL_URL', 'https://ecg.test.upc.ua/rbrs/merchant/'),
         'success_url' => env('RAIFFEISEN_SUCCESS_URL', ''),
         'failure_url' => env('RAIFFEISEN_FAILURE_URL', ''),
+        'pem_path' => env('RAIFFEISEN_PEM_PATH', base_path('docs/raiffeisen/test-merchant.pem')),
         'certificate_path' => env('RAIFFEISEN_CERT_PATH', base_path('docs/raiffeisen/test-server.cert')),
     ],
 

@@ -176,7 +176,7 @@ class RaiffeisenPaymentService
         // Sign header.payload with merchant private key
         $dataToSign = "{$header}.{$payloadEncoded}";
         $privateKey = openssl_pkey_get_private(
-            file_get_contents(base_path("../docs/raiffeisen/{$this->merchantId}.pem"))
+            file_get_contents(config('zalet.raiffeisen.pem_path'))
         );
         openssl_sign($dataToSign, $signature, $privateKey, OPENSSL_ALGO_SHA256);
         $signatureEncoded = $this->base64UrlEncode($signature);
@@ -496,8 +496,7 @@ class RaiffeisenPaymentService
             '', // trailing semicolon
         ]);
 
-        // PEM key is in project root docs/raiffeisen/ (one level above api/)
-        $pemPath = base_path("../docs/raiffeisen/{$this->merchantId}.pem");
+        $pemPath = config('zalet.raiffeisen.pem_path');
 
         if (!file_exists($pemPath)) {
             Log::error('Merchant PEM key not found', ['path' => $pemPath]);

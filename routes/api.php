@@ -359,7 +359,7 @@ Route::prefix('v1')->group(function () {
                     Route::get('/{conversation}', [ConversationController::class, 'show']);
                     Route::patch('/{conversation}', [ConversationController::class, 'update']);
                     Route::get('/{conversation}/messages', [MessageController::class, 'index']);
-                    Route::post('/{conversation}/messages', [MessageController::class, 'store']);
+                    Route::post('/{conversation}/messages', [MessageController::class, 'store'])->middleware('throttle:chat');
                     Route::get('/{conversation}/messages/around/{message}', [MessageController::class, 'around']);
                     Route::patch('/{conversation}/messages/{message}', [MessageController::class, 'update']);
                     Route::post('/{conversation}/messages/{message}/reactions', [MessageController::class, 'addReaction']);

@@ -45,6 +45,8 @@ class User extends Authenticatable implements FilamentUser, HasName, MustVerifyE
         'is_legacy_founder',
         'storage_limit_mb',
         'storage_used_bytes',
+        'registration_ip',
+        'last_ip',
     ];
 
     protected $hidden = [

@@ -35,6 +35,8 @@ class AuthController extends Controller
             'username' => $request->username,
             'password' => $request->password,
             'role' => 'user',
+            'registration_ip' => $request->ip(),
+            'last_ip' => $request->ip(),
         ]);
 
         // Create empty profile for the user
@@ -89,6 +91,8 @@ class AuthController extends Controller
         }
 
         $user = User::where('email', $request->email)->firstOrFail();
+
+        $user->update(['last_ip' => $request->ip()]);
 
         // Revoke previous tokens (optional: single device login)
         // $user->tokens()->delete();

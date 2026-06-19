@@ -104,6 +104,16 @@ class UserResource extends Resource
                     ->label('Storage Used')
                     ->formatStateUsing(fn ($state) => number_format($state / 1024 / 1024, 2) . ' MB')
                     ->sortable(),
+                Tables\Columns\TextColumn::make('registration_ip')
+                    ->label('Reg. IP')
+                    ->searchable()
+                    ->copyable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('last_ip')
+                    ->label('Last IP')
+                    ->searchable()
+                    ->copyable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -123,6 +133,13 @@ class UserResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
+                Tables\Actions\DeleteAction::make()
+                    ->requiresConfirmation()
+                    ->modalHeading('Delete User')
+                    ->modalDescription('This will permanently delete the user and all their data. This cannot be undone.')
+                    ->before(function (User $record) {
+                        $record->tokens()->delete();
+                    }),
                 Tables\Actions\Action::make('markAsFounder')
                     ->label('Mark as Founder')
                     ->icon('heroicon-o-star')

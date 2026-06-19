@@ -223,6 +223,12 @@ class WalletController extends Controller
                 ],
             ]);
         } catch (\Exception $e) {
+            Log::error('Payment order creation failed', [
+                'user_id' => $user->id,
+                'amount' => $amount,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return response()->json([
                 'message' => 'Failed to create payment order.',
                 'error' => $e->getMessage(),

@@ -162,6 +162,8 @@ class WalletController extends Controller
      */
     public function deposit(DepositRequest $request, RaiffeisenPaymentService $paymentService): JsonResponse
     {
+        return response()->json(['message' => 'Kupovina coinova je privremeno nedostupna. Uskoro ponovo!'], 503);
+
         $user = $request->user();
         $amount = $request->validated('amount');
         $paymentMethodId = $request->input('payment_method_id');

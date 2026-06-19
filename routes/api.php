@@ -424,6 +424,12 @@ Route::prefix('v1')->group(function () {
                 Route::post('/gift-categories', [AdminGiftController::class, 'storeCategory']);
                 Route::put('/gift-categories/{giftCategory}', [AdminGiftController::class, 'updateCategory']);
                 Route::delete('/gift-categories/{giftCategory}', [AdminGiftController::class, 'destroyCategory']);
+
+                // Coin Packages
+                Route::get('/coin-packages', [CoinPackageController::class, 'adminIndex']);
+                Route::post('/coin-packages', [CoinPackageController::class, 'store']);
+                Route::put('/coin-packages/{package}', [CoinPackageController::class, 'update']);
+                Route::delete('/coin-packages/{package}', [CoinPackageController::class, 'destroy']);
             }
             );
 

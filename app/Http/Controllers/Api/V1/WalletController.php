@@ -14,6 +14,7 @@ use App\Services\CoinService;
 use App\Services\RaiffeisenPaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class WalletController extends Controller
 {

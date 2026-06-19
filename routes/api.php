@@ -355,7 +355,7 @@ Route::prefix('v1')->group(function () {
                     Route::get('/unread-count', [ConversationController::class, 'unreadCount']);
                     // Static prefixes must come before /{conversation} to avoid UUID binding collision
                     Route::get('/invite/{inviteCode}', [ConversationController::class, 'groupInfo']);
-                    Route::get('/join/{inviteCode}', [ConversationController::class, 'joinByCode']);
+                    Route::get('/join/{inviteCode}', [ConversationController::class, 'joinByCode'])->middleware('throttle:chat');
                     Route::get('/{conversation}', [ConversationController::class, 'show']);
                     Route::patch('/{conversation}', [ConversationController::class, 'update']);
                     Route::get('/{conversation}/messages', [MessageController::class, 'index']);

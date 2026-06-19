@@ -8,6 +8,7 @@ use App\Models\Board;
 use App\Models\BoardPost;
 use App\Services\PlanLimitsService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 
 class BoardPostController extends Controller
@@ -103,24 +104,6 @@ class BoardPostController extends Controller
             ], 403);
         }
 
-        // Check if user has enough coins if they are over the limit
-        if (!$postCheck['allowed'] && $postCheck['coin_cost'] > 0) {
-            $balance = $request->user()->wallet?->balance ?? 0;
-            if ($balance < $postCheck['coin_cost']) {
-                return response()->json([
-                    'message' => "Need {$postCheck['coin_cost']} ZaletCoins to post. Your balance: {$balance} ZC.",
-                    'error_type' => 'plan_limit',
-                    'coin_cost' => $postCheck['coin_cost'],
-                ], 403);
-            }
-
-            // Deduct coins
-            $request->user()->wallet->decrement('balance', $postCheck['coin_cost']);
-            $coinCharged = $postCheck['coin_cost'];
-        } else {
-            $coinCharged = 0;
-        }
-
         $userId = $request->user()->id;
 
         // On private boards, posts from non-admins/mods go into pending review
@@ -129,17 +112,38 @@ class BoardPostController extends Controller
             $status = 'pending';
         }
 
-        $post = $board->posts()->create([
-            'user_id' => $userId,
-            'title' => $request->input('title'),
-            'body' => $request->input('body'),
-            'category' => $request->input('category'),
-            'type' => $request->input('type', 'offer'),
-            'images' => $request->input('images', []),
-            'location_label' => $request->input('location_label'),
-            'place_id' => $request->input('place_id'),
-            'status' => $status,
-        ]);
+        $coinCharged = 0;
+
+        $post = DB::transaction(function () use ($request, $board, $postCheck, $userId, $status, &$coinCharged) {
+            // Re-check balance inside transaction with lock to prevent race condition
+            if (!$postCheck['allowed'] && $postCheck['coin_cost'] > 0) {
+                $wallet = $request->user()->wallet()->lockForUpdate()->first();
+                $balance = $wallet?->balance ?? 0;
+
+                if ($balance < $postCheck['coin_cost']) {
+                    abort(403, json_encode([
+                        'message' => "Need {$postCheck['coin_cost']} ZaletCoins to post. Your balance: {$balance} ZC.",
+                        'error_type' => 'plan_limit',
+                        'coin_cost' => $postCheck['coin_cost'],
+                    ]));
+                }
+
+                $wallet->decrement('balance', $postCheck['coin_cost']);
+                $coinCharged = $postCheck['coin_cost'];
+            }
+
+            return $board->posts()->create([
+                'user_id' => $userId,
+                'title' => $request->input('title'),
+                'body' => $request->input('body'),
+                'category' => $request->input('category'),
+                'type' => $request->input('type', 'offer'),
+                'images' => $request->input('images', []),
+                'location_label' => $request->input('location_label'),
+                'place_id' => $request->input('place_id'),
+                'status' => $status,
+            ]);
+        });
 
         $post->load(['user:id,username,role', 'user.profile:id,user_id,avatar_url', 'place']);
 

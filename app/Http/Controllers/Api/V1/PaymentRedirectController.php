@@ -28,6 +28,12 @@ class PaymentRedirectController extends Controller
         $gatewayUrl = $data['gateway_url'];
         $params = $data['params'];
 
+        $allowedHosts = ['ecommerce.raiffeisenbank.rs'];
+        $host = parse_url($gatewayUrl, PHP_URL_HOST);
+        if (!in_array($host, $allowedHosts, true)) {
+            abort(400, 'Invalid payment gateway.');
+        }
+
         // Build hidden input fields
         $inputs = '';
         foreach ($params as $key => $value) {

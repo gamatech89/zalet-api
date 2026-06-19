@@ -77,8 +77,9 @@ class AdminController extends Controller
         }
 
         // Sorting
-        $sortBy = $request->get('sort_by', 'created_at');
-        $sortOrder = $request->get('sort_order', 'desc');
+        $allowedSort = ['created_at', 'username', 'email', 'role', 'last_ip'];
+        $sortBy = in_array($request->get('sort_by'), $allowedSort) ? $request->get('sort_by') : 'created_at';
+        $sortOrder = $request->get('sort_order') === 'asc' ? 'asc' : 'desc';
         $query->orderBy($sortBy, $sortOrder);
 
         $users = $query->select([
@@ -103,7 +104,15 @@ class AdminController extends Controller
      */
     public function updateUser(UpdateUserRequest $request, User $user): JsonResponse
     {
-        $user->update($request->validated());
+        $validated = $request->validated();
+
+        // role is not mass-assignable; set it directly
+        if (array_key_exists('role', $validated)) {
+            $user->role = $validated['role'];
+            unset($validated['role']);
+        }
+
+        $user->fill($validated)->save();
 
         return response()->json([
             'message' => 'User updated successfully.',
@@ -170,8 +179,9 @@ class AdminController extends Controller
         }
 
         // Sorting
-        $sortBy = $request->get('sort_by', 'created_at');
-        $sortOrder = $request->get('sort_order', 'desc');
+        $allowedSort = ['created_at', 'amount', 'type', 'status'];
+        $sortBy = in_array($request->get('sort_by'), $allowedSort) ? $request->get('sort_by') : 'created_at';
+        $sortOrder = $request->get('sort_order') === 'asc' ? 'asc' : 'desc';
         $query->orderBy($sortBy, $sortOrder);
 
         $transactions = $query->paginate($request->get('per_page', 20));
@@ -211,8 +221,9 @@ class AdminController extends Controller
         }
 
         // Sorting
-        $sortBy = $request->get('sort_by', 'created_at');
-        $sortOrder = $request->get('sort_order', 'desc');
+        $allowedSort = ['created_at', 'type', 'is_ppv'];
+        $sortBy = in_array($request->get('sort_by'), $allowedSort) ? $request->get('sort_by') : 'created_at';
+        $sortOrder = $request->get('sort_order') === 'asc' ? 'asc' : 'desc';
         $query->orderBy($sortBy, $sortOrder);
 
         $media = $query->paginate($request->get('per_page', 20));
@@ -260,8 +271,9 @@ class AdminController extends Controller
         }
 
         // Sorting
-        $sortBy = $request->get('sort_by', 'created_at');
-        $sortOrder = $request->get('sort_order', 'desc');
+        $allowedSort = ['created_at', 'is_live'];
+        $sortBy = in_array($request->get('sort_by'), $allowedSort) ? $request->get('sort_by') : 'created_at';
+        $sortOrder = $request->get('sort_order') === 'asc' ? 'asc' : 'desc';
         $query->orderBy($sortBy, $sortOrder);
 
         $streams = $query->paginate($request->get('per_page', 20));

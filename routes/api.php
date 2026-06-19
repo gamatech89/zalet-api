@@ -362,7 +362,7 @@ Route::prefix('v1')->group(function () {
                     Route::post('/{conversation}/messages', [MessageController::class, 'store'])->middleware('throttle:chat');
                     Route::get('/{conversation}/messages/around/{message}', [MessageController::class, 'around']);
                     Route::patch('/{conversation}/messages/{message}', [MessageController::class, 'update']);
-                    Route::post('/{conversation}/messages/{message}/reactions', [MessageController::class, 'addReaction']);
+                    Route::post('/{conversation}/messages/{message}/reactions', [MessageController::class, 'addReaction'])->middleware('throttle:chat');
                     Route::post('/{conversation}/typing', [MessageController::class, 'typing']);
                     // Group member management
                     Route::post('/{conversation}/members', [ConversationController::class, 'addMembers']);

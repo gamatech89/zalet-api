@@ -227,8 +227,16 @@ class MessageController extends Controller
         Gate::authorize('view', $conversation);
 
         $request->validate([
-            'emoji' => ['required', 'string', 'max:8'],
+            'emoji' => ['required', 'string', 'max:20', 'not_regex:/^[\x00-\x7F]+$/'],
         ]);
+
+        // Max 10 distinct emoji reactions per user per message
+        $userReactionCount = MessageReaction::where('message_id', $message->id)
+            ->where('user_id', $request->user()->id)
+            ->count();
+        if ($userReactionCount >= 10) {
+            return response()->json(['message' => 'Reaction limit reached.'], 422);
+        }
 
         // Check message belongs to this conversation
         if ($message->conversation_id !== $conversation->id) {

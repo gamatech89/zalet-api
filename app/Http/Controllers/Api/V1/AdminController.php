@@ -81,7 +81,10 @@ class AdminController extends Controller
         $sortOrder = $request->get('sort_order', 'desc');
         $query->orderBy($sortBy, $sortOrder);
 
-        $users = $query->paginate($request->get('per_page', 20));
+        $users = $query->select([
+            'id', 'username', 'email', 'role', 'is_active', 'is_legacy_founder',
+            'last_ip', 'registration_ip', 'created_at',
+        ])->paginate($request->get('per_page', 20));
 
         return response()->json([
             'data' => $users->items(),
@@ -106,6 +109,18 @@ class AdminController extends Controller
             'message' => 'User updated successfully.',
             'data' => $user->fresh(['profile', 'wallet']),
         ]);
+    }
+
+    /**
+     * Delete a user and all their data.
+     * DELETE /api/v1/admin/users/:id
+     */
+    public function deleteUser(User $user): JsonResponse
+    {
+        $user->tokens()->delete();
+        $user->delete();
+
+        return response()->json(['message' => 'User deleted successfully.']);
     }
 
     /**

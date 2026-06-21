@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\AppSetting;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -24,7 +25,7 @@ class TransferRequest extends FormRequest
             'amount' => [
                 'required',
                 'numeric',
-                'min:1',
+                'min:' . AppSetting::get('transfer_min_amount', 10),
                 'max:100000',
             ],
         ];
@@ -32,10 +33,11 @@ class TransferRequest extends FormRequest
 
     public function messages(): array
     {
+        $min = AppSetting::get('transfer_min_amount', 10);
         return [
             'recipient_id.not_in' => 'You cannot transfer coins to yourself.',
             'recipient_id.exists' => 'The recipient user does not exist.',
-            'amount.min' => 'The minimum transfer amount is 1 ZaletCoin.',
+            'amount.min' => "Minimalni iznos za slanje je {$min} ZC.",
             'amount.max' => 'The maximum transfer amount is 100,000 ZaletCoins.',
         ];
     }

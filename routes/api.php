@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\AdminController;
 use App\Http\Controllers\Api\V1\AdminGiftController;
+use App\Http\Controllers\Api\V1\AdminSettingsController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BankAccountController;
 use App\Http\Controllers\Api\V1\BoardController;
@@ -430,6 +431,10 @@ Route::prefix('v1')->group(function () {
                 Route::post('/coin-packages', [CoinPackageController::class, 'store']);
                 Route::put('/coin-packages/{package}', [CoinPackageController::class, 'update']);
                 Route::delete('/coin-packages/{package}', [CoinPackageController::class, 'destroy']);
+
+                // Economy Settings
+                Route::get('/settings', [AdminSettingsController::class, 'index']);
+                Route::put('/settings/{key}', [AdminSettingsController::class, 'update']);
             }
             );
 

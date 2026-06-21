@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AppSetting;
 use App\Models\Gift;
 use App\Models\Media;
 use App\Models\StreamSession;
@@ -104,9 +105,9 @@ class CoinService
             // Lock wallets in consistent order to prevent deadlocks
             $walletIds = [$fromWallet->id, $toWallet->id];
             sort($walletIds);
-            
+
             Wallet::whereIn('id', $walletIds)->lockForUpdate()->get();
-            
+
             // Refresh to get locked values
             $fromWallet = $fromWallet->fresh();
             $toWallet = $toWallet->fresh();
@@ -115,22 +116,29 @@ class CoinService
                 throw new \RuntimeException('Insufficient balance.');
             }
 
-            // Debit sender
+            // Apply platform fee on direct tips (not on gift/stream transfers — those use gift_creator_percent)
+            $feePercent = ($type === 'tip' && !$gift)
+                ? AppSetting::get('transfer_fee_percent', 10)
+                : 0;
+
+            $feeAmount = round($amount * ($feePercent / 100), 2);
+            $receiverAmount = $amount - $feeAmount;
+
+            // Debit sender full amount
             $fromWallet->decrement('balance', $amount);
 
-            // Credit receiver
-            $toWallet->increment('balance', $amount);
+            // Credit receiver minus fee (fee stays with platform — not credited anywhere)
+            $toWallet->increment('balance', $receiverAmount);
 
-            // Create transaction record
             $transaction = Transaction::create([
                 'from_wallet_id' => $fromWallet->id,
-                'to_wallet_id' => $toWallet->id,
-                'amount' => $amount,
-                'type' => $type,
-                'status' => 'completed',
-                'media_id' => $media?->id,
-                'gift_id' => $gift?->id,
-                'description' => $description,
+                'to_wallet_id'   => $toWallet->id,
+                'amount'         => $amount,
+                'type'           => $type,
+                'status'         => 'completed',
+                'media_id'       => $media?->id,
+                'gift_id'        => $gift?->id,
+                'description'    => $description,
             ]);
 
             return $transaction;
@@ -158,20 +166,44 @@ class CoinService
         Gift $gift,
         StreamSession $session
     ): Transaction {
-        $transaction = $this->transfer(
-            $fromUser,
-            $streamer,
-            $gift->coin_price,
-            'tip',
-            null,
-            $gift,
-            "Stream gift: {$gift->name}"
-        );
+        $creatorPercent = AppSetting::get('gift_creator_percent', 50);
+        $creatorAmount = round($gift->coin_price * ($creatorPercent / 100), 2);
 
-        // Update stream session stats
-        $session->addCoins($gift->coin_price);
+        return DB::transaction(function () use ($fromUser, $streamer, $gift, $session, $creatorAmount) {
+            $fromWallet = $this->ensureWallet($fromUser);
+            $toWallet   = $this->ensureWallet($streamer);
 
-        return $transaction;
+            $walletIds = [$fromWallet->id, $toWallet->id];
+            sort($walletIds);
+            Wallet::whereIn('id', $walletIds)->lockForUpdate()->get();
+
+            $fromWallet = $fromWallet->fresh();
+            $toWallet   = $toWallet->fresh();
+
+            if (!$fromWallet->hasBalance($gift->coin_price)) {
+                throw new \RuntimeException('Insufficient balance.');
+            }
+
+            // Sender pays full gift price
+            $fromWallet->decrement('balance', $gift->coin_price);
+
+            // Creator receives only their percentage
+            $toWallet->increment('balance', $creatorAmount);
+
+            $transaction = Transaction::create([
+                'from_wallet_id' => $fromWallet->id,
+                'to_wallet_id'   => $toWallet->id,
+                'amount'         => $gift->coin_price,
+                'type'           => 'tip',
+                'status'         => 'completed',
+                'gift_id'        => $gift->id,
+                'description'    => "Stream gift: {$gift->name}",
+            ]);
+
+            $session->addCoins($gift->coin_price);
+
+            return $transaction;
+        });
     }
 
     /**

@@ -46,6 +46,7 @@ class User extends Authenticatable implements FilamentUser, HasName, MustVerifyE
         'storage_used_bytes',
         'registration_ip',
         'last_ip',
+        'is_active',
         'suspended_until',
         'suspension_reason',
     ];

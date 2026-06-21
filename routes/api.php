@@ -363,9 +363,11 @@ Route::prefix('v1')->group(function () {
                     Route::post('/{conversation}/messages', [MessageController::class, 'store'])->middleware('throttle:chat');
                     Route::get('/{conversation}/messages/around/{message}', [MessageController::class, 'around']);
                     Route::patch('/{conversation}/messages/{message}', [MessageController::class, 'update']);
+                    Route::delete('/{conversation}/messages/{message}', [MessageController::class, 'destroy']);
                     Route::post('/{conversation}/messages/{message}/reactions', [MessageController::class, 'addReaction'])->middleware('throttle:chat');
                     Route::post('/{conversation}/typing', [MessageController::class, 'typing']);
                     // Group member management
+                    Route::delete('/{conversation}/members/{member}/messages', [MessageController::class, 'destroyUserMessages']);
                     Route::post('/{conversation}/members', [ConversationController::class, 'addMembers']);
                     Route::delete('/{conversation}/members/{member}', [ConversationController::class, 'kickMember']);
                     Route::patch('/{conversation}/members/{member}/role', [ConversationController::class, 'updateMemberRole']);

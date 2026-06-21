@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Events\MessageDeletedEvent;
 use App\Events\MessageEditedEvent;
 use App\Events\MessageReadEvent;
 use App\Events\MessageSentEvent;
@@ -272,6 +273,49 @@ class MessageController extends Controller
                 'reactions' => $this->formatReactions($message),
             ],
         ]);
+    }
+
+    /**
+     * Delete a single message (sender, group admin/owner, or platform admin).
+     * DELETE /api/v1/conversations/{conversation}/messages/{message}
+     */
+    public function destroy(Request $request, Conversation $conversation, Message $message): JsonResponse
+    {
+        Gate::authorize('deleteMessage', [$conversation, $message]);
+
+        if ($message->conversation_id !== $conversation->id) {
+            return response()->json(['message' => 'Message not found in this conversation.'], 404);
+        }
+
+        $messageId = $message->id;
+        $message->delete();
+
+        broadcast(new MessageDeletedEvent($messageId, $conversation->id))->toOthers();
+
+        return response()->json(['message' => 'Message deleted.']);
+    }
+
+    /**
+     * Delete all messages from a member in this group (group admin/owner or platform admin).
+     * DELETE /api/v1/conversations/{conversation}/members/{member}/messages
+     */
+    public function destroyUserMessages(Request $request, Conversation $conversation, \App\Models\User $member): JsonResponse
+    {
+        Gate::authorize('deleteUserMessages', $conversation);
+
+        $messageIds = $conversation->messages()
+            ->where('sender_id', $member->id)
+            ->pluck('id');
+
+        $conversation->messages()
+            ->where('sender_id', $member->id)
+            ->delete();
+
+        foreach ($messageIds as $msgId) {
+            broadcast(new MessageDeletedEvent($msgId, $conversation->id))->toOthers();
+        }
+
+        return response()->json(['message' => "Deleted {$messageIds->count()} messages."]);
     }
 
     /**

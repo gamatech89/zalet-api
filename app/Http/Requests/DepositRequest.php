@@ -17,7 +17,7 @@ class DepositRequest extends FormRequest
             'amount' => [
                 'required',
                 'numeric',
-                'min:100',      // Minimum 100 RSD
+                'min:1',
                 'max:500000',   // Maximum 500,000 RSD
             ],
         ];
@@ -26,7 +26,7 @@ class DepositRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'amount.min' => 'The minimum deposit amount is 100 RSD.',
+            'amount.min' => 'The minimum deposit amount is 1 RSD.',
             'amount.max' => 'The maximum deposit amount is 500,000 RSD.',
         ];
     }

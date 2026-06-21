@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Events\MessageSentEvent;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateConversationRequest;
 use App\Models\Conversation;
+use App\Models\Message;
 use App\Models\User;
 use App\Services\PlanLimitsService;
 use Illuminate\Http\JsonResponse;
@@ -305,6 +307,10 @@ class ConversationController extends Controller
         $pivotData = $toAdd->mapWithKeys(fn ($id) => [$id => ['joined_at' => now(), 'role' => 'member']])->toArray();
         $conversation->users()->attach($pivotData);
 
+        $addedNames = User::whereIn('id', $toAdd->values())->pluck('username')->implode(', ');
+        $actor = $this->displayName($request->user());
+        $this->postSystemMessage($conversation, $request->user()->id, "{$actor} je dodao {$addedNames} u grupu.");
+
         return response()->json(['message' => 'Members added.']);
     }
 
@@ -335,6 +341,10 @@ class ConversationController extends Controller
         }
 
         $conversation->users()->detach($member->id);
+
+        $actor = $this->displayName($request->user());
+        $target = $this->displayName($member);
+        $this->postSystemMessage($conversation, $request->user()->id, "{$actor} je uklonio {$target} iz grupe.");
 
         return response()->json(['message' => 'Member removed from group.']);
     }
@@ -380,6 +390,10 @@ class ConversationController extends Controller
             ]
         );
 
+        $actor = $this->displayName($request->user());
+        $target = $this->displayName($member);
+        $this->postSystemMessage($conversation, $request->user()->id, "{$actor} je banovao {$target}.");
+
         return response()->json(['message' => 'User banned from group.']);
     }
 
@@ -396,6 +410,10 @@ class ConversationController extends Controller
         if (!$deleted) {
             return response()->json(['message' => 'User is not banned.'], 404);
         }
+
+        $actor = $this->displayName($request->user());
+        $target = $this->displayName($member);
+        $this->postSystemMessage($conversation, $request->user()->id, "{$actor} je uklonio ban za {$target}.");
 
         return response()->json(['message' => 'User unbanned.']);
     }
@@ -426,6 +444,13 @@ class ConversationController extends Controller
         }
 
         $conversation->users()->updateExistingPivot($member->id, ['role' => $validated['role']]);
+
+        $actor = $this->displayName($request->user());
+        $target = $this->displayName($member);
+        $text = $validated['role'] === 'admin'
+            ? "{$actor} je postavio {$target} za admina."
+            : "{$actor} je uklonio {$target} iz uloge admina.";
+        $this->postSystemMessage($conversation, $request->user()->id, $text);
 
         return response()->json(['message' => 'Member role updated.']);
     }
@@ -476,6 +501,9 @@ class ConversationController extends Controller
         }
 
         $conversation->users()->detach($user->id);
+
+        $name = $this->displayName($user);
+        $this->postSystemMessage($conversation, $user->id, "{$name} je napustio grupu.");
 
         return response()->json(['message' => 'You have left the group.']);
     }
@@ -595,5 +623,25 @@ class ConversationController extends Controller
         } while (Conversation::where('invite_code', $code)->exists());
 
         return $code;
+    }
+
+    private function displayName(User $user): string
+    {
+        return $user->name ?? $user->username;
+    }
+
+    private function postSystemMessage(Conversation $conversation, string $actorId, string $content): void
+    {
+        $message = $conversation->messages()->create([
+            'sender_id'    => $actorId,
+            'content'      => $content,
+            'message_type' => 'system',
+        ]);
+
+        $message->load(['sender:id,username,name', 'sender.profile:user_id,avatar_url']);
+
+        $conversation->touch();
+
+        broadcast(new MessageSentEvent($message));
     }
 }

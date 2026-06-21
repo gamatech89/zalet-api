@@ -399,6 +399,8 @@ Route::prefix('v1')->group(function () {
                 Route::patch('/users/{user}', [AdminController::class , 'updateUser']);
                 Route::delete('/users/{user}', [AdminController::class , 'deleteUser']);
                 Route::post('/users/{user}/founder', [AdminController::class , 'markFounder']);
+                Route::post('/users/{user}/suspend', [AdminController::class, 'suspendUser']);
+                Route::delete('/users/{user}/suspend', [AdminController::class, 'unsuspendUser']);
                 Route::get('/transactions', [AdminController::class , 'listTransactions']);
                 Route::get('/media', [AdminController::class , 'listMedia']);
                 Route::delete('/media/{media}', [AdminController::class , 'deleteMedia']);

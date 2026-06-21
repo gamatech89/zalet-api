@@ -46,6 +46,8 @@ class User extends Authenticatable implements FilamentUser, HasName, MustVerifyE
         'storage_used_bytes',
         'registration_ip',
         'last_ip',
+        'suspended_until',
+        'suspension_reason',
     ];
 
     protected $hidden = [
@@ -57,12 +59,18 @@ class User extends Authenticatable implements FilamentUser, HasName, MustVerifyE
     {
         return [
             'email_verified_at' => 'datetime',
+            'suspended_until'   => 'datetime',
             'password' => 'hashed',
             'legacy_id' => 'integer',
             'is_legacy_founder' => 'boolean',
             'storage_limit_mb' => 'integer',
             'storage_used_bytes' => 'integer',
         ];
+    }
+
+    public function isSuspended(): bool
+    {
+        return $this->suspended_until !== null && $this->suspended_until->isFuture();
     }
 
     // === Relationships ===

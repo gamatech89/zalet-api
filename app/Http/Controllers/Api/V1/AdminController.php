@@ -84,7 +84,7 @@ class AdminController extends Controller
 
         $users = $query->select([
             'id', 'username', 'email', 'role', 'is_active', 'is_legacy_founder',
-            'last_ip', 'registration_ip', 'created_at',
+            'last_ip', 'registration_ip', 'suspended_until', 'suspension_reason', 'created_at',
         ])->paginate($request->get('per_page', 20));
 
         return response()->json([
@@ -130,6 +130,51 @@ class AdminController extends Controller
         $user->delete();
 
         return response()->json(['message' => 'User deleted successfully.']);
+    }
+
+    /**
+     * Temporarily suspend a user for a set number of hours.
+     * POST /api/v1/admin/users/{user}/suspend
+     */
+    public function suspendUser(Request $request, User $user): JsonResponse
+    {
+        if ($user->role === 'admin') {
+            return response()->json(['message' => 'Cannot suspend an admin.'], 403);
+        }
+
+        $request->validate([
+            'hours'  => ['required', 'integer', 'in:24,48,96'],
+            'reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $until = now()->addHours($request->hours);
+
+        $user->update([
+            'suspended_until'  => $until,
+            'suspension_reason' => $request->reason,
+        ]);
+
+        // Revoke tokens so active sessions are kicked out immediately
+        $user->tokens()->delete();
+
+        return response()->json([
+            'message' => "User suspended for {$request->hours}h.",
+            'suspended_until' => $until->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * Lift a suspension immediately.
+     * DELETE /api/v1/admin/users/{user}/suspend
+     */
+    public function unsuspendUser(User $user): JsonResponse
+    {
+        $user->update([
+            'suspended_until'  => null,
+            'suspension_reason' => null,
+        ]);
+
+        return response()->json(['message' => 'Suspension lifted.']);
     }
 
     /**

@@ -92,6 +92,15 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->firstOrFail();
 
+        if ($user->isSuspended()) {
+            $until = $user->suspended_until->format('d.m.Y H:i');
+            return response()->json([
+                'message' => "Nalog je privremeno suspendovan do {$until}.",
+                'suspended_until' => $user->suspended_until->toIso8601String(),
+                'suspension_reason' => $user->suspension_reason,
+            ], 403);
+        }
+
         $user->update(['last_ip' => $request->ip()]);
 
         // Revoke previous tokens (optional: single device login)

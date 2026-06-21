@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreCinemaRequest;
+use App\Models\AppSetting;
 use App\Models\Media;
 use App\Services\ContentAccessService;
 use App\Services\EmbedService;
@@ -96,6 +97,10 @@ class CinemaController extends Controller
      */
     public function store(StoreCinemaRequest $request): JsonResponse
     {
+        if ($request->boolean('is_ppv')) {
+            $this->checkPpvLimits($request->user()->id);
+        }
+
         $url = $request->input('url');
         $metadata = $this->embedService->extractMetadata($url);
 
@@ -149,5 +154,27 @@ class CinemaController extends Controller
         return response()->json([
             'message' => 'Cinema embed deleted successfully',
         ]);
+    }
+
+    private function checkPpvLimits(int $userId): void
+    {
+        $monthlyLimit = AppSetting::get('ppv_monthly_limit', 3);
+        $thisMonthCount = Media::where('user_id', $userId)
+            ->where('is_ppv', true)
+            ->whereYear('created_at', now()->year)
+            ->whereMonth('created_at', now()->month)
+            ->count();
+        if ($thisMonthCount >= $monthlyLimit) {
+            abort(422, "Dostigli ste mesečni limit od {$monthlyLimit} PPV videa.");
+        }
+
+        $maxPercent = AppSetting::get('ppv_content_percent', 25);
+        $totalCount = Media::where('user_id', $userId)->count();
+        $ppvCount = Media::where('user_id', $userId)->where('is_ppv', true)->count();
+        $maxAllowed = max(1, (int) floor(($totalCount + 1) * ($maxPercent / 100)));
+
+        if ($ppvCount + 1 > $maxAllowed) {
+            abort(422, "Ne možete imati više od {$maxPercent}% PPV sadržaja (limit: {$maxAllowed} od " . ($totalCount + 1) . " videa).");
+        }
     }
 }

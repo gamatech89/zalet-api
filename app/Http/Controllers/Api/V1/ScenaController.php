@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\AppSetting;
 use App\Models\Media;
 use App\Services\ContentAccessService;
 use App\Services\EmbedService;
@@ -157,6 +158,10 @@ class ScenaController extends Controller
             'required_plan_level' => 'nullable|integer|min:1|max:10',
         ]);
 
+        if ($request->boolean('is_ppv')) {
+            $this->checkPpvLimits($request->user()->id, isNewUpload: true);
+        }
+
         try {
             $media = $this->mediaService->storeVideo(
                 user: $request->user(),
@@ -219,6 +224,10 @@ class ScenaController extends Controller
             'access_level'        => 'sometimes|string|in:free,premium,vip',
             'required_plan_level' => 'nullable|integer|min:1|max:10',
         ]);
+
+        if ($request->boolean('is_ppv') && !$media->is_ppv) {
+            $this->checkPpvLimits($request->user()->id, isNewUpload: false);
+        }
 
         $data = $request->only(['title', 'description', 'is_ppv', 'access_level', 'required_plan_level']);
 
@@ -291,6 +300,10 @@ class ScenaController extends Controller
             'required_plan_level' => 'nullable|integer|min:1|max:10',
         ]);
 
+        if ($request->boolean('is_ppv')) {
+            $this->checkPpvLimits($request->user()->id, isNewUpload: true);
+        }
+
         $url = $request->input('url');
         $metadata = $this->embedService->extractMetadata($url);
 
@@ -320,5 +333,30 @@ class ScenaController extends Controller
                 'price_coins' => $media->price_coins,
             ],
         ], 201);
+    }
+
+    private function checkPpvLimits(int $userId, bool $isNewUpload): void
+    {
+        if ($isNewUpload) {
+            $monthlyLimit = AppSetting::get('ppv_monthly_limit', 3);
+            $thisMonthCount = Media::where('user_id', $userId)
+                ->where('is_ppv', true)
+                ->whereYear('created_at', now()->year)
+                ->whereMonth('created_at', now()->month)
+                ->count();
+            if ($thisMonthCount >= $monthlyLimit) {
+                abort(422, "Dostigli ste mesečni limit od {$monthlyLimit} PPV videa.");
+            }
+        }
+
+        $maxPercent = AppSetting::get('ppv_content_percent', 25);
+        $totalCount = Media::where('user_id', $userId)->count();
+        $ppvCount = Media::where('user_id', $userId)->where('is_ppv', true)->count();
+        $effectiveTotal = $isNewUpload ? $totalCount + 1 : $totalCount;
+        $maxAllowed = max(1, (int) floor($effectiveTotal * ($maxPercent / 100)));
+
+        if ($ppvCount + 1 > $maxAllowed) {
+            abort(422, "Ne možete imati više od {$maxPercent}% PPV sadržaja (limit: {$maxAllowed} od {$effectiveTotal} videa).");
+        }
     }
 }

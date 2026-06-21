@@ -28,6 +28,24 @@ class SettingsSeeder extends Seeder
                 'type'        => 'integer',
                 'description' => 'Procenat vrednosti gifta koji ide kreatoru (ostatak zadržava platforma)',
             ],
+            [
+                'key'         => 'ppv_creator_percent',
+                'value'       => '60',
+                'type'        => 'integer',
+                'description' => 'Procenat od PPV kupovine koji ide kreatoru (ostatak ide platformi)',
+            ],
+            [
+                'key'         => 'ppv_content_percent',
+                'value'       => '25',
+                'type'        => 'integer',
+                'description' => 'Maksimalni procenat ukupnog sadržaja kreatora koji sme biti PPV',
+            ],
+            [
+                'key'         => 'ppv_monthly_limit',
+                'value'       => '3',
+                'type'        => 'integer',
+                'description' => 'Maksimalan broj PPV videa koje kreator može objaviti u jednom mesecu',
+            ],
         ];
 
         foreach ($settings as $s) {

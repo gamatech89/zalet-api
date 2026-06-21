@@ -68,6 +68,9 @@ class AdminSettingsController extends Controller
             'transfer_fee_percent'  => $this->assertRange($value, 0, 50),
             'transfer_min_amount'   => $this->assertRange($value, 1, 10000),
             'gift_creator_percent'  => $this->assertRange($value, 0, 100),
+            'ppv_creator_percent'   => $this->assertRange($value, 0, 100),
+            'ppv_content_percent'   => $this->assertRange($value, 1, 100),
+            'ppv_monthly_limit'     => $this->assertRange($value, 0, 100),
             default                 => null,
         };
     }

@@ -195,15 +195,38 @@ class CoinService
             throw new \InvalidArgumentException('Media is not available for purchase.');
         }
 
-        return $this->transfer(
-            $buyer,
-            $media->user,
-            (float) $media->price_coins,
-            'ppv',
-            $media,
-            null,
-            "PPV purchase: {$media->title}"
-        );
+        $creatorPercent = AppSetting::get('ppv_creator_percent', 60);
+        $price = (float) $media->price_coins;
+        $creatorAmount = round($price * ($creatorPercent / 100), 2);
+
+        return DB::transaction(function () use ($buyer, $media, $price, $creatorAmount) {
+            $buyerWallet   = $this->ensureWallet($buyer);
+            $creatorWallet = $this->ensureWallet($media->user);
+
+            $walletIds = [$buyerWallet->id, $creatorWallet->id];
+            sort($walletIds);
+            Wallet::whereIn('id', $walletIds)->lockForUpdate()->get();
+
+            $buyerWallet   = $buyerWallet->fresh();
+            $creatorWallet = $creatorWallet->fresh();
+
+            if (!$buyerWallet->hasBalance($price)) {
+                throw new \RuntimeException('Insufficient balance.');
+            }
+
+            $buyerWallet->decrement('balance', $price);
+            $creatorWallet->increment('balance', $creatorAmount);
+
+            return Transaction::create([
+                'from_wallet_id' => $buyerWallet->id,
+                'to_wallet_id'   => $creatorWallet->id,
+                'amount'         => $price,
+                'type'           => 'ppv',
+                'status'         => 'completed',
+                'media_id'       => $media->id,
+                'description'    => "PPV purchase: {$media->title}",
+            ]);
+        });
     }
 
     /**

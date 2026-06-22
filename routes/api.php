@@ -160,6 +160,8 @@ Route::prefix('v1')->group(function () {
             Route::get('/{board:slug}/posts/{post}', [BoardPostController::class , 'show']);
             Route::get('/{board:slug}/categories', [BoardAdminController::class , 'listCategories']);
             Route::get('/{board:slug}/members', [BoardAdminController::class , 'listMembers']);
+            Route::get('/{board:slug}/streams', [BoardController::class, 'streams']);
+            Route::post('/{board:slug}/streams', [BoardController::class, 'scheduleStream'])->middleware('auth:sanctum');
             Route::post('/{board:slug}/join', [BoardController::class, 'join'])->middleware('auth:sanctum');
             Route::post('/{board:slug}/leave', [BoardController::class, 'leave'])->middleware('auth:sanctum');
         });
@@ -167,6 +169,7 @@ Route::prefix('v1')->group(function () {
         // Live Streaming (public - anyone can browse & watch)
         Route::prefix('streams')->group(function () {
             Route::get('/live', [LiveStreamController::class , 'live']);
+            Route::get('/upcoming', [LiveStreamController::class , 'upcoming']);
             Route::get('/{liveStream}', [LiveStreamController::class , 'show'])
                 ->where('liveStream', '[0-9a-f\-]{36}');
             Route::get('/{liveStream}/token', [LiveStreamController::class , 'viewerToken'])

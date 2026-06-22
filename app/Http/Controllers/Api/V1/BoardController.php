@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Board;
 use App\Models\BoardJoinRequest;
 use App\Models\Conversation;
+use App\Models\LiveStream;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -135,6 +137,92 @@ class BoardController extends Controller
             'data' => $board,
         ], 201);
     }
+    /**
+     * Get upcoming and live streams for a board.
+     *
+     * GET /api/v1/boards/{board}/streams
+     */
+    public function streams(Board $board): JsonResponse
+    {
+        $streams = LiveStream::where('board_id', $board->id)
+            ->where(function ($q) {
+                $q->where('is_live', true)
+                  ->orWhere(function ($q2) {
+                      $q2->whereNotNull('scheduled_at')
+                         ->where('scheduled_at', '>', now()->subHours(1))
+                         ->where('is_live', false);
+                  });
+            })
+            ->with('user:id,username')
+            ->orderByRaw('is_live DESC, scheduled_at ASC NULLS LAST')
+            ->get();
+
+        return response()->json([
+            'data' => $streams->map(fn ($s) => [
+                'id'           => $s->id,
+                'title'        => $s->title,
+                'stream_mode'  => $s->stream_mode,
+                'is_live'      => $s->is_live,
+                'scheduled_at' => $s->scheduled_at?->toIso8601String(),
+                'streamer'     => ['id' => $s->user->id, 'username' => $s->user->username],
+            ]),
+        ]);
+    }
+
+    /**
+     * Schedule a stream for a board.
+     *
+     * POST /api/v1/boards/{board}/streams
+     */
+    public function scheduleStream(Request $request, Board $board): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user->isCreator() || (!$user->isAdmin() && !$board->userIsAdmin($user->id))) {
+            return response()->json(['message' => 'Only creators who are board admins can schedule streams.'], 403);
+        }
+
+        $validated = $request->validate([
+            'title'        => 'required|string|max:100',
+            'scheduled_at' => 'required|date|after:now',
+            'stream_mode'  => 'sometimes|in:scena,moments',
+        ]);
+
+        $stream = LiveStream::create([
+            'user_id'      => $user->id,
+            'board_id'     => $board->id,
+            'title'        => $validated['title'],
+            'stream_mode'  => $validated['stream_mode'] ?? 'scena',
+            'scheduled_at' => $validated['scheduled_at'],
+            'is_live'      => false,
+        ]);
+
+        // Notify all board members
+        $notifier = app(NotificationService::class);
+        $scheduledDate = $stream->scheduled_at->format('d.m.Y H:i');
+        $board->members()->with('user')->where('user_id', '!=', $user->id)->get()
+            ->each(function ($member) use ($notifier, $board, $stream, $scheduledDate) {
+                $notifier->create(
+                    $member->user,
+                    'system',
+                    'Zakazan stream',
+                    "Zakazan je stream u zajednici {$board->name}: \"{$stream->title}\" — {$scheduledDate}",
+                    ['board_slug' => $board->slug, 'stream_id' => $stream->id]
+                );
+            });
+
+        return response()->json([
+            'data' => [
+                'id'           => $stream->id,
+                'title'        => $stream->title,
+                'stream_mode'  => $stream->stream_mode,
+                'is_live'      => $stream->is_live,
+                'scheduled_at' => $stream->scheduled_at->toIso8601String(),
+                'streamer'     => ['id' => $user->id, 'username' => $user->username],
+            ],
+        ], 201);
+    }
+
     /**
      * Join a board.
      *

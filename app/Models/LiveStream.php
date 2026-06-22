@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\Board;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -16,6 +17,7 @@ class LiveStream extends Model
 
     protected $fillable = [
         'user_id',
+        'board_id',
         'title',
         'stream_key',
         'is_live',
@@ -57,6 +59,11 @@ class LiveStream extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function board(): BelongsTo
+    {
+        return $this->belongsTo(Board::class);
     }
 
     public function sessions(): HasMany

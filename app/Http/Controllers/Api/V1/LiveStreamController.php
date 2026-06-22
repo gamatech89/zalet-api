@@ -36,10 +36,23 @@ class LiveStreamController extends Controller
 
         $streamMode = $request->input('stream_mode', 'scena');
 
-        $stream = $user->liveStreams()->create([
-            'title' => $request->title,
-            'stream_mode' => $streamMode,
-        ]);
+        // Optionally activate an existing scheduled stream instead of creating a new one
+        if ($request->filled('stream_id')) {
+            $stream = $user->liveStreams()
+                ->where('id', $request->stream_id)
+                ->where('is_live', false)
+                ->whereNull('livekit_room_name')
+                ->firstOrFail();
+            $stream->update([
+                'title'       => $request->title,
+                'stream_mode' => $streamMode,
+            ]);
+        } else {
+            $stream = $user->liveStreams()->create([
+                'title'       => $request->title,
+                'stream_mode' => $streamMode,
+            ]);
+        }
 
         // Create LiveKit room
         $roomName = $this->liveKit->createRoom($stream);
@@ -213,6 +226,31 @@ class LiveStreamController extends Controller
     }
 
     /**
+     * List all upcoming scheduled streams (public).
+     * GET /api/v1/streams/upcoming
+     */
+    public function upcoming(): JsonResponse
+    {
+        $streams = LiveStream::whereNotNull('scheduled_at')
+            ->where('scheduled_at', '>', now())
+            ->where('is_live', false)
+            ->with('user:id,username')
+            ->orderBy('scheduled_at')
+            ->limit(20)
+            ->get();
+
+        return response()->json([
+            'data' => $streams->map(fn ($s) => [
+                'id'           => $s->id,
+                'title'        => $s->title,
+                'stream_mode'  => $s->stream_mode,
+                'scheduled_at' => $s->scheduled_at->toIso8601String(),
+                'streamer'     => ['id' => $s->user->id, 'username' => $s->user->username],
+            ]),
+        ]);
+    }
+
+    /**
      * List all currently live streams.
      * GET /api/v1/streams/live
      */
@@ -353,6 +391,7 @@ class LiveStreamController extends Controller
                     'id' => $liveStream->user->id,
                     'username' => $liveStream->user->username,
                 ],
+                'scheduled_at' => $liveStream->scheduled_at?->toIso8601String(),
                 'viewers' => $liveStream->currentSession?->peak_viewers ?? 0,
                 'started_at' => $liveStream->currentSession?->start_time?->toIso8601String(),
                 'livekit_ws_url' => $this->liveKit->getWsUrl(),

@@ -23,6 +23,7 @@ class CreateStreamRequest extends FormRequest
         return [
             'title' => ['required', 'string', 'max:100'],
             'stream_mode' => ['sometimes', 'string', 'in:scena,moments'],
+            'stream_id' => ['sometimes', 'uuid'],
         ];
     }
 

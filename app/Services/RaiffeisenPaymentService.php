@@ -243,15 +243,17 @@ class RaiffeisenPaymentService
         }
 
         // Build the data string for verification (based on notify.php reference)
-        // Delay field is not always present in the POST — default to '0' (immediate capture)
-        $delay = $data['Delay'] ?? '0';
+        // When Delay is not present in POST, omit the ",Delay" suffix from OrderID
+        $orderIdPart = isset($data['Delay'])
+            ? ($data['OrderID'] ?? '') . ',' . $data['Delay']
+            : ($data['OrderID'] ?? '');
 
         if (!empty($data['AltTotalAmount'])) {
             $dataString = implode(';', [
                 $data['MerchantID'] ?? '',
                 $data['TerminalID'] ?? '',
                 $data['PurchaseTime'] ?? '',
-                ($data['OrderID'] ?? '') . ',' . $delay,
+                $orderIdPart,
                 $data['XID'] ?? '',
                 ($data['Currency'] ?? '') . ',' . ($data['AltCurrency'] ?? ''),
                 ($data['TotalAmount'] ?? '') . ',' . ($data['AltTotalAmount'] ?? ''),
@@ -264,7 +266,7 @@ class RaiffeisenPaymentService
                 $data['MerchantID'] ?? '',
                 $data['TerminalID'] ?? '',
                 $data['PurchaseTime'] ?? '',
-                ($data['OrderID'] ?? '') . ',' . $delay,
+                $orderIdPart,
                 $data['XID'] ?? '',
                 $data['Currency'] ?? '',
                 $data['TotalAmount'] ?? '',

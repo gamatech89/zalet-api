@@ -278,16 +278,6 @@ class RaiffeisenPaymentService
 
         $signatureRaw = base64_decode($data['Signature'] ?? '');
 
-        Log::debug('Raiffeisen webhook verification data', [
-            'received_fields' => array_keys($data),
-            'delay_value' => $data['Delay'] ?? 'NOT_PRESENT',
-            'data_string' => $dataString,
-            'data_string_length' => strlen($dataString),
-            'signature_b64' => $data['Signature'] ?? '',
-            'signature_b64_length' => strlen($data['Signature'] ?? ''),
-            'signature_raw_bytes' => strlen($signatureRaw),
-        ]);
-
         // Load the UPC certificate
         $certPath = config('zalet.raiffeisen.certificate_path');
 
@@ -296,43 +286,17 @@ class RaiffeisenPaymentService
             return false;
         }
 
-        $certContent = file_get_contents($certPath);
-        $publicKey = openssl_pkey_get_public($certContent);
+        $publicKey = openssl_pkey_get_public(file_get_contents($certPath));
 
         if (!$publicKey) {
-            Log::error('Failed to load Raiffeisen certificate', [
-                'path' => $certPath,
-                'cert_length' => strlen($certContent),
-                'openssl_error' => openssl_error_string(),
-            ]);
+            Log::error('Failed to load Raiffeisen certificate', ['path' => $certPath]);
             return false;
         }
 
-        $keyDetails = openssl_pkey_get_details($publicKey);
+        // Raiffeisen/UPC signs webhooks with RSA + SHA-512
+        $verifyResult = openssl_verify($dataString, $signatureRaw, $publicKey, OPENSSL_ALGO_SHA512);
 
-        // Try SHA1 (default) first, then SHA256
-        $verifyResult = openssl_verify($dataString, $signatureRaw, $publicKey, OPENSSL_ALGO_SHA1);
-
-        Log::debug('Raiffeisen openssl_verify result', [
-            'verify_result_sha1' => $verifyResult,
-            'openssl_error_sha1' => openssl_error_string(),
-            'key_bits' => $keyDetails['bits'] ?? 'unknown',
-            'key_type' => $keyDetails['type'] ?? 'unknown',
-            'cert_path' => $certPath,
-        ]);
-
-        if ($verifyResult !== 1) {
-            // Try SHA256 as fallback
-            $verifyResult256 = openssl_verify($dataString, $signatureRaw, $publicKey, OPENSSL_ALGO_SHA256);
-            Log::debug('Raiffeisen openssl_verify SHA256 fallback', [
-                'verify_result_sha256' => $verifyResult256,
-                'openssl_error_sha256' => openssl_error_string(),
-            ]);
-        }
-
-        if (PHP_VERSION_ID >= 80000) {
-            // PHP 8.0+ doesn't need openssl_free_key
-        } else {
+        if (PHP_VERSION_ID < 80000) {
             openssl_free_key($publicKey);
         }
 

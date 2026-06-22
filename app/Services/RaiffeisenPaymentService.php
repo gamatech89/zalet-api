@@ -158,11 +158,12 @@ class RaiffeisenPaymentService
         );
 
         // Build JWS payload per Raiffeisen tokenization spec
+        // Token was received in the 'Recurrent' field from webhook — use same field name
         $payload = [
             'MerchantID' => $this->merchantId,
             'TerminalID' => $this->terminalId,
             'OrderID' => $orderId,
-            'UPCToken' => $paymentMethod->gateway_token,
+            'Recurrent' => $paymentMethod->gateway_token,
             'TotalAmount' => $amountInParas,
             'Currency' => 941,
             'PurchaseTime' => $purchaseTime,

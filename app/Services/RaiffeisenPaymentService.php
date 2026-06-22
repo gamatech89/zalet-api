@@ -157,13 +157,13 @@ class RaiffeisenPaymentService
             raiffeisenOrderId: $orderId,
         );
 
-        // Build JWS payload per Raiffeisen tokenization spec
-        // Token was received in the 'Recurrent' field from webhook — use same field name
+        // Build JWS payload per Raiffeisen tokenization spec (Section 11)
+        // NOTE: Webhook sends token as 'Recurrent', but payByToken REQUEST requires 'UPCToken'
         $payload = [
             'MerchantID' => $this->merchantId,
             'TerminalID' => $this->terminalId,
             'OrderID' => $orderId,
-            'Recurrent' => $paymentMethod->gateway_token,
+            'UPCToken' => $paymentMethod->gateway_token,
             'TotalAmount' => $amountInParas,
             'Currency' => 941,
             'PurchaseTime' => $purchaseTime,
@@ -187,12 +187,15 @@ class RaiffeisenPaymentService
         // Replace last path segment with payByToken
         $tokenPaymentUrl = preg_replace('/\/[^\/]+$/', '/payByToken', $this->gatewayUrl);
 
-        // JWS compact serialization: header.payload.signature (single string in 'jws' field)
-        $jwsToken = "{$header}.{$payloadEncoded}.{$signatureEncoded}";
+        // JWS JSON serialization: three separate fields per bank spec (Section 11)
+        // Bank expects {"header": "...", "payload": "...", "signature": "..."}
+        // NOT compact serialization (header.payload.signature in single 'jws' field)
 
         try {
             $response = \Illuminate\Support\Facades\Http::post($tokenPaymentUrl, [
-                'jws' => $jwsToken,
+                'header' => $header,
+                'payload' => $payloadEncoded,
+                'signature' => $signatureEncoded,
             ]);
 
             $result = $response->json() ?? [];

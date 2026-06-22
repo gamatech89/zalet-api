@@ -182,16 +182,19 @@ class RaiffeisenPaymentService
         $signatureEncoded = $this->base64UrlEncode($signature);
 
         // POST JWS to payByToken endpoint
-        $tokenPaymentUrl = str_replace('/enter', '/payByToken', $this->gatewayUrl);
+        // Gateway URL is e.g. https://ecommerce.raiffeisenbank.rs/rbrs/pay
+        // Replace last path segment with payByToken
+        $tokenPaymentUrl = preg_replace('/\/[^\/]+$/', '/payByToken', $this->gatewayUrl);
+
+        // JWS compact serialization: header.payload.signature (single string in 'jws' field)
+        $jwsToken = "{$header}.{$payloadEncoded}.{$signatureEncoded}";
 
         try {
             $response = \Illuminate\Support\Facades\Http::post($tokenPaymentUrl, [
-                'header' => $header,
-                'payload' => $payloadEncoded,
-                'signature' => $signatureEncoded,
+                'jws' => $jwsToken,
             ]);
 
-            $result = $response->json();
+            $result = $response->json() ?? [];
 
             Log::info('Tokenized payment submitted', [
                 'user_id' => $user->id,
@@ -199,7 +202,10 @@ class RaiffeisenPaymentService
                 'amount_rsd' => $amountRsd,
                 'payment_method_id' => $paymentMethod->id,
                 'card_last_four' => $paymentMethod->last_four,
+                'token_url' => $tokenPaymentUrl,
+                'http_status' => $response->status(),
                 'response_tran_code' => $result['TranCode'] ?? 'unknown',
+                'response_body' => $response->body(),
             ]);
 
             // Check if token payment was immediately approved

@@ -341,8 +341,9 @@ class RaiffeisenPaymentService
             // Coin deposit flow
             $this->coinService->confirmDeposit($transaction);
 
-            // Auto-save card if UPCToken is present in response
-            if (!empty($data['UPCToken'])) {
+            // Auto-save card if Recurrent token (or UPCToken) is present
+            $hasToken = !empty($data['Recurrent']) || !empty($data['UPCToken']);
+            if ($hasToken && !empty($data['ProxyPan'])) {
                 $this->saveCardFromWebhook($data, $transaction->toWallet?->user_id ?? '');
             }
 
@@ -350,7 +351,7 @@ class RaiffeisenPaymentService
                 'order_id' => $orderId,
                 'transaction_id' => $transaction->id,
                 'approval_code' => $approvalCode,
-                'has_token' => !empty($data['UPCToken']),
+                'has_token' => $hasToken,
             ]);
 
             return $this->buildWebhookResponse($data, 'approve', 'ok');
@@ -379,7 +380,8 @@ class RaiffeisenPaymentService
      */
     public function saveCardFromWebhook(array $data, string $userId): ?PaymentMethod
     {
-        $token = $data['UPCToken'] ?? null;
+        // Raiffeisen sends 'Recurrent' as the card token; 'UPCToken' is an alias in older docs
+        $token = $data['Recurrent'] ?? $data['UPCToken'] ?? null;
         $proxyPan = $data['ProxyPan'] ?? null;
 
         if (!$token || !$userId) {
@@ -388,18 +390,17 @@ class RaiffeisenPaymentService
 
         // Check if this token already exists for this user
         $existing = PaymentMethod::where('user_id', $userId)
-            ->whereRaw("gateway_token = ?", [$token])
+            ->where('gateway_token', $token)
             ->first();
 
         if ($existing) {
             return $existing;
         }
 
-        // Extract last 4 from ProxyPan (format: zero-padded, last 4 are real digits)
+        // Extract last 4 from ProxyPan (zero-padded, last 4 are real digits)
         $lastFour = $proxyPan ? substr($proxyPan, -4) : '0000';
         $firstDigit = $proxyPan ? substr($proxyPan, 0, 1) : '0';
 
-        // Detect brand from first digit of PAN
         $brand = match ($firstDigit) {
             '4' => 'visa',
             '5' => 'mastercard',
@@ -408,7 +409,7 @@ class RaiffeisenPaymentService
             default => 'visa',
         };
 
-        // Parse UPCTokenExp (MMYYYY -> MM and YY)
+        // Raiffeisen doesn't always send UPCTokenExp — default to blanks
         $tokenExp = $data['UPCTokenExp'] ?? '';
         $expiryMonth = strlen($tokenExp) >= 2 ? substr($tokenExp, 0, 2) : '00';
         $expiryYear = strlen($tokenExp) >= 6 ? substr($tokenExp, 4, 2) : '00';

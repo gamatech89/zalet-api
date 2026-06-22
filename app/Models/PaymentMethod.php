@@ -73,6 +73,11 @@ class PaymentMethod extends Model
      */
     public function isExpired(): bool
     {
+        // Unknown expiry (Raiffeisen didn't send UPCTokenExp) — treat as valid
+        if ($this->expiry_month === '00' || $this->expiry_year === '00') {
+            return false;
+        }
+
         $expiry = \Carbon\Carbon::createFromFormat(
             'y-m',
             "{$this->expiry_year}-{$this->expiry_month}"

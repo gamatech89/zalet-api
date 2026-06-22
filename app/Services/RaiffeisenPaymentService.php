@@ -243,31 +243,34 @@ class RaiffeisenPaymentService
         }
 
         // Build the data string for verification (based on notify.php reference)
+        // Delay field is not always present in the POST — default to '0' (immediate capture)
+        $delay = $data['Delay'] ?? '0';
+
         if (!empty($data['AltTotalAmount'])) {
             $dataString = implode(';', [
-                $data['MerchantID'],
-                $data['TerminalID'],
-                $data['PurchaseTime'],
-                $data['OrderID'] . ',' . $data['Delay'],
-                $data['XID'],
-                $data['Currency'] . ',' . $data['AltCurrency'],
-                $data['TotalAmount'] . ',' . $data['AltTotalAmount'],
-                $data['SD'],
-                $data['TranCode'],
-                $data['ApprovalCode'],
+                $data['MerchantID'] ?? '',
+                $data['TerminalID'] ?? '',
+                $data['PurchaseTime'] ?? '',
+                ($data['OrderID'] ?? '') . ',' . $delay,
+                $data['XID'] ?? '',
+                ($data['Currency'] ?? '') . ',' . ($data['AltCurrency'] ?? ''),
+                ($data['TotalAmount'] ?? '') . ',' . ($data['AltTotalAmount'] ?? ''),
+                $data['SD'] ?? '',
+                $data['TranCode'] ?? '',
+                $data['ApprovalCode'] ?? '',
             ]) . ';';
         } else {
             $dataString = implode(';', [
-                $data['MerchantID'],
-                $data['TerminalID'],
-                $data['PurchaseTime'],
-                $data['OrderID'] . ',' . $data['Delay'],
-                $data['XID'],
-                $data['Currency'],
-                $data['TotalAmount'],
-                $data['SD'],
-                $data['TranCode'],
-                $data['ApprovalCode'],
+                $data['MerchantID'] ?? '',
+                $data['TerminalID'] ?? '',
+                $data['PurchaseTime'] ?? '',
+                ($data['OrderID'] ?? '') . ',' . $delay,
+                $data['XID'] ?? '',
+                $data['Currency'] ?? '',
+                $data['TotalAmount'] ?? '',
+                $data['SD'] ?? '',
+                $data['TranCode'] ?? '',
+                $data['ApprovalCode'] ?? '',
             ]) . ';';
         }
 

@@ -274,6 +274,14 @@ class RaiffeisenPaymentService
             ]) . ';';
         }
 
+        Log::debug('Raiffeisen webhook verification data', [
+            'received_fields' => array_keys($data),
+            'delay_value' => $data['Delay'] ?? 'NOT_PRESENT',
+            'data_string' => $dataString,
+            'data_string_length' => strlen($dataString),
+            'signature_b64_length' => strlen($data['Signature'] ?? ''),
+        ]);
+
         // Load the UPC certificate
         $certPath = config('zalet.raiffeisen.certificate_path');
         

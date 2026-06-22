@@ -431,15 +431,6 @@ class RaiffeisenPaymentService
             return null;
         }
 
-        // Check if this token already exists for this user
-        $existing = PaymentMethod::where('user_id', $userId)
-            ->where('gateway_token', $token)
-            ->first();
-
-        if ($existing) {
-            return $existing;
-        }
-
         // Extract last 4 from ProxyPan (zero-padded, last 4 are real digits)
         $lastFour = $proxyPan ? substr($proxyPan, -4) : '0000';
         $firstDigit = $proxyPan ? substr($proxyPan, 0, 1) : '0';
@@ -456,6 +447,18 @@ class RaiffeisenPaymentService
         $tokenExp = $data['UPCTokenExp'] ?? '';
         $expiryMonth = strlen($tokenExp) >= 2 ? substr($tokenExp, 0, 2) : '00';
         $expiryYear = strlen($tokenExp) >= 6 ? substr($tokenExp, 4, 2) : '00';
+
+        // If same card already exists (same brand + last 4), update the token instead of
+        // creating a duplicate — Raiffeisen issues a new Recurrent token on each payment.
+        $existing = PaymentMethod::where('user_id', $userId)
+            ->where('card_brand', $brand)
+            ->where('last_four', $lastFour)
+            ->first();
+
+        if ($existing) {
+            $existing->update(['gateway_token' => $token]);
+            return $existing;
+        }
 
         $isFirst = PaymentMethod::where('user_id', $userId)->count() === 0;
 

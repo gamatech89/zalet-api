@@ -215,6 +215,7 @@ Route::prefix('v1')->group(function () {
                 Route::prefix('payment-methods')->group(function () {
                     Route::get('/', [PaymentMethodController::class, 'index']);
                     Route::post('/', [PaymentMethodController::class, 'store']);
+                    Route::post('/add-card', [PaymentMethodController::class, 'addCard']);
                     Route::put('/{paymentMethod}/default', [PaymentMethodController::class, 'setDefault']);
                     Route::delete('/', [PaymentMethodController::class, 'destroyAll']);
                     Route::delete('/{paymentMethod}', [PaymentMethodController::class, 'destroy']);

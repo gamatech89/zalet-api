@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\PaymentMethod;
+use App\Services\RaiffeisenPaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -23,6 +24,27 @@ class PaymentMethodController extends Controller
             ->map(fn ($m) => $this->formatMethod($m));
 
         return response()->json(['data' => $methods]);
+    }
+
+    /**
+     * Create a 1 RSD card registration payment via Raiffeisen to capture a new card token.
+     *
+     * POST /api/v1/payment-methods/add-card
+     */
+    public function addCard(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (PaymentMethod::where('user_id', $user->id)->count() >= 10) {
+            return response()->json(['message' => 'Maximum of 10 payment methods allowed.'], 422);
+        }
+
+        $result = app(RaiffeisenPaymentService::class)->createCardRegistrationOrder($user);
+
+        return response()->json([
+            'payment_url' => $result['payment_url'],
+            'order_id' => $result['order_id'],
+        ]);
     }
 
     /**

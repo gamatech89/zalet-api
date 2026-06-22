@@ -304,6 +304,38 @@ class RaiffeisenPaymentService
     }
 
     /**
+     * Create a 1 RSD card registration order to capture a new card token.
+     *
+     * Uses ZADD- prefix to distinguish from coin deposits in webhook handler.
+     */
+    public function createCardRegistrationOrder(User $user): array
+    {
+        $orderId = $this->generateCardRegistrationOrderId();
+        $amountInParas = 100; // 1.00 RSD = 100 paras
+
+        $paymentUrl = $this->buildPaymentUrl([
+            'MerchantID' => $this->merchantId,
+            'TerminalID' => $this->terminalId,
+            'TotalAmount' => $amountInParas,
+            'Currency' => '941',
+            'locale' => 'sr',
+            'OrderID' => $orderId,
+            'PurchaseTime' => now()->format('ymdHis'),
+            'SD' => $this->generateCardRegistrationSessionData($orderId, $user->id),
+        ]);
+
+        Log::info('Card registration order created', [
+            'user_id' => $user->id,
+            'order_id' => $orderId,
+        ]);
+
+        return [
+            'payment_url' => $paymentUrl,
+            'order_id' => $orderId,
+        ];
+    }
+
+    /**
      * Process a webhook notification from Raiffeisen.
      *
      * @param array $data POST data from webhook
@@ -317,6 +349,11 @@ class RaiffeisenPaymentService
 
         if (!$orderId) {
             return $this->buildWebhookResponse($data, 'reverse', 'Missing OrderID');
+        }
+
+        // Card registration flow (ZADD- prefix) — no Transaction record involved
+        if ($this->isCardRegistrationPayment($orderId)) {
+            return $this->processCardRegistrationPayment($data, $orderId);
         }
 
         // Find the pending transaction
@@ -558,6 +595,69 @@ class RaiffeisenPaymentService
     }
 
     // ── Subscription Payment Helpers ──
+
+    /**
+     * Generate unique order ID for card registration.
+     */
+    protected function generateCardRegistrationOrderId(): string
+    {
+        // Format: ZADD-YYYYMMDD-XXXXX (19 chars, under 20 char UPC limit)
+        return 'ZADD-' . now()->format('Ymd') . '-' . strtoupper(Str::random(5));
+    }
+
+    /**
+     * Check if an order ID is a card registration payment.
+     */
+    protected function isCardRegistrationPayment(string $orderId): bool
+    {
+        return str_starts_with($orderId, 'ZADD-');
+    }
+
+    /**
+     * Generate session data for card registration payment.
+     */
+    protected function generateCardRegistrationSessionData(string $orderId, string $userId): string
+    {
+        return base64_encode(json_encode([
+            'o' => $orderId,
+            'a' => 100,
+            'u' => $userId,
+            't' => time(),
+        ]));
+    }
+
+    /**
+     * Process a confirmed card registration webhook — just save the card, no coin credit.
+     */
+    protected function processCardRegistrationPayment(array $data, string $orderId): array
+    {
+        $tranCode = $data['TranCode'] ?? null;
+        $approvalCode = $data['ApprovalCode'] ?? null;
+
+        if ($tranCode !== '000' || empty($approvalCode)) {
+            Log::warning('Card registration payment declined', ['order_id' => $orderId]);
+            return $this->buildWebhookResponse($data, 'reverse', 'Payment declined');
+        }
+
+        $sd = json_decode(base64_decode($data['SD'] ?? ''), true);
+        $userId = $sd['u'] ?? null;
+
+        if (!$userId) {
+            Log::error('Card registration: missing user_id in SD', ['order_id' => $orderId]);
+            return $this->buildWebhookResponse($data, 'reverse', 'Invalid session data');
+        }
+
+        $hasToken = !empty($data['Recurrent']) || !empty($data['UPCToken']);
+        if ($hasToken && !empty($data['ProxyPan'])) {
+            $this->saveCardFromWebhook($data, $userId);
+            Log::info('Card saved via registration payment', [
+                'order_id' => $orderId,
+                'user_id' => $userId,
+            ]);
+        }
+
+        return $this->buildWebhookResponse($data, 'approve', 'ok');
+    }
 
     /**
      * Generate unique order ID for subscriptions.

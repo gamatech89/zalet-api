@@ -286,21 +286,20 @@ class RaiffeisenPaymentService
             return false;
         }
 
-        $publicKey = openssl_pkey_get_public(file_get_contents($certPath));
-
-        if (!$publicKey) {
-            Log::error('Failed to load Raiffeisen certificate', ['path' => $certPath]);
+        // Use phpseclib instead of OpenSSL — Raiffeisen uses a 1024-bit RSA key which
+        // OpenSSL 3 (Ubuntu 24.04) rejects for SHA-512 operations due to security level 2.
+        // phpseclib implements RSA in pure PHP and has no such restriction.
+        try {
+            $key = \phpseclib3\Crypt\PublicKeyLoader::load(file_get_contents($certPath));
+            $key = $key->withHash('sha512')->withPadding(\phpseclib3\Crypt\RSA::SIGNATURE_PKCS1);
+            return $key->verify($dataString, $signatureRaw);
+        } catch (\Exception $e) {
+            Log::error('Raiffeisen signature verification error', [
+                'error' => $e->getMessage(),
+                'order_id' => $data['OrderID'] ?? 'unknown',
+            ]);
             return false;
         }
-
-        // Raiffeisen/UPC signs webhooks with RSA + SHA-512
-        $verifyResult = openssl_verify($dataString, $signatureRaw, $publicKey, OPENSSL_ALGO_SHA512);
-
-        if (PHP_VERSION_ID < 80000) {
-            openssl_free_key($publicKey);
-        }
-
-        return $verifyResult === 1;
     }
 
     /**

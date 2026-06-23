@@ -411,7 +411,8 @@ Route::prefix('v1')->group(function () {
                 Route::get('/streams', [AdminController::class , 'listStreams']);
                 Route::post('/streams/{liveStream}/end', [AdminController::class , 'endStream']);
 
-                // Community approval
+                // Community management
+                Route::get('/communities', [AdminController::class, 'listCommunities']);
                 Route::get('/communities/pending', [AdminController::class, 'listPendingCommunities']);
                 Route::patch('/communities/{board}', [AdminController::class, 'reviewCommunity']);
 

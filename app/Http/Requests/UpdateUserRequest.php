@@ -23,6 +23,7 @@ class UpdateUserRequest extends FormRequest
     {
         return [
             'role' => ['sometimes', Rule::in(['user', 'creator', 'admin'])],
+            'is_active' => ['sometimes', 'boolean'],
             'is_legacy_founder' => ['sometimes', 'boolean'],
             'storage_limit_mb' => ['sometimes', 'integer', 'min:0'],
         ];

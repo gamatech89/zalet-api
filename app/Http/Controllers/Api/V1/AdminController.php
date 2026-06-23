@@ -364,6 +364,39 @@ class AdminController extends Controller
     // =============================================
 
     /**
+     * List all active communities with search and pagination.
+     * GET /api/v1/admin/communities
+     */
+    public function listCommunities(Request $request): JsonResponse
+    {
+        $query = Board::where('is_active', true);
+
+        if ($request->has('search')) {
+            $search = strtolower($request->search);
+            $query->where(function ($q) use ($search) {
+                $q->whereRaw('LOWER(name) LIKE ?', ["%{$search}%"])
+                  ->orWhereRaw('LOWER(description) LIKE ?', ["%{$search}%"]);
+            });
+        }
+
+        $communities = $query
+            ->with(['members' => fn ($q) => $q->where('role', 'admin')->with('user:id,username')])
+            ->withCount('members')
+            ->orderBy('created_at', 'desc')
+            ->paginate(20);
+
+        return response()->json([
+            'data' => $communities->items(),
+            'meta' => [
+                'current_page' => $communities->currentPage(),
+                'last_page'    => $communities->lastPage(),
+                'per_page'     => $communities->perPage(),
+                'total'        => $communities->total(),
+            ],
+        ]);
+    }
+
+    /**
      * List communities pending approval.
      * GET /api/v1/admin/communities/pending
      */
@@ -379,18 +412,23 @@ class AdminController extends Controller
     }
 
     /**
-     * Approve or reject a community.
+     * Approve, reject, or deactivate a community.
      * PATCH /api/v1/admin/communities/{board}
      */
     public function reviewCommunity(Request $request, Board $board): JsonResponse
     {
         $request->validate([
-            'action' => 'required|in:approve,reject',
+            'action' => 'required|in:approve,reject,deactivate',
         ]);
 
         if ($request->input('action') === 'approve') {
             $board->update(['is_active' => true]);
             return response()->json(['message' => 'Community approved and is now live.', 'data' => $board]);
+        }
+
+        if ($request->input('action') === 'deactivate') {
+            $board->update(['is_active' => false]);
+            return response()->json(['message' => 'Community deactivated.', 'data' => $board]);
         }
 
         // On reject — delete board, its chat, and all related data (cascade handles the rest)

@@ -52,12 +52,19 @@ class BoardController extends Controller
 
         $data = $board->toArray();
 
-        // For authenticated users, include join request status
+        // For authenticated users, include join request status and auto-sync to board chat
         if ($user = $request->user()) {
             $joinRequest = BoardJoinRequest::where('board_id', $board->id)
                 ->where('user_id', $user->id)
                 ->first();
             $data['has_pending_join_request'] = $joinRequest?->status === 'pending';
+
+            // Backfill: if user is a board member, ensure they are in the linked conversation
+            if ($board->conversation_id && $board->members()->where('user_id', $user->id)->exists()) {
+                $board->conversation->users()->syncWithoutDetaching([
+                    $user->id => ['joined_at' => now()],
+                ]);
+            }
         } else {
             $data['has_pending_join_request'] = false;
         }

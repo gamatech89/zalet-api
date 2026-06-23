@@ -63,12 +63,13 @@ class ConversationController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $perPage = min((int) $request->get('per_page', 50), 100);
         $conversations = $request->user()
             ->conversations()
             ->with(['latestMessage.sender:id,username', 'users:id,username,name', 'board:id,name,slug,image_url'])
             ->withCount('messages')
             ->orderBy('updated_at', 'desc')
-            ->paginate(20);
+            ->paginate($perPage);
 
         $userId = $request->user()->id;
 

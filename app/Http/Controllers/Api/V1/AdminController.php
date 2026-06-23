@@ -55,7 +55,15 @@ class AdminController extends Controller
      */
     public function listUsers(Request $request): JsonResponse
     {
-        $query = User::with(['profile', 'wallet']);
+        $query = User::with([
+            'profile',
+            'wallet:id,user_id,balance',
+            'subscriptions' => function ($q) {
+                $q->active()
+                  ->select(['id', 'user_id', 'subscription_plan_id', 'status', 'ends_at'])
+                  ->with('plan:id,name');
+            },
+        ]);
 
         // Filter by role
         if ($request->has('role')) {

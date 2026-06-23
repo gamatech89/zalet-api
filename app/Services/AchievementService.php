@@ -6,6 +6,7 @@ use App\Enums\AchievementState;
 use App\Models\Achievement;
 use App\Models\AchievementTier;
 use App\Models\User;
+use App\Support\JsonMapping\JsonTypeConverter;
 use App\Services\Achievements\Rewards\Reward;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -176,7 +177,7 @@ class AchievementService
                 'id' => $claimable->id,
                 'level' => $claimable->level,
                 'threshold' => $claimable->threshold,
-                'reward' => $claimable->reward,
+                'reward' => $claimable->reward ? JsonTypeConverter::toArray($claimable->reward) : null,
             ] : null,
             'next_tier' => $nextTier ? [
                 'level' => $nextTier->level,

@@ -2,14 +2,22 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\EventType;
+use App\Enums\MediaProvider;
+use App\Enums\MediaType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreMomentRequest;
 use App\Models\Media;
+use App\Models\MediaBookmark;
+use App\Models\MediaLike;
+use App\Models\UserEvent;
+use App\Services\Achievements\Payloads\MediaPostedPayload;
 use App\Services\ContentAccessService;
 use App\Services\MediaService;
 use App\Services\PlanLimitsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 class MomentController extends Controller
@@ -42,17 +50,17 @@ class MomentController extends Controller
         $bookmarkedIds = [];
         $followingIds = [];
         if ($authUser) {
-            $likedIds = \App\Models\MediaLike::where('user_id', $authUser->id)
+            $likedIds = MediaLike::where('user_id', $authUser->id)
                 ->whereIn('media_id', $momentIds)
                 ->pluck('media_id')
                 ->flip()
                 ->all();
-            $bookmarkedIds = \App\Models\MediaBookmark::where('user_id', $authUser->id)
+            $bookmarkedIds = MediaBookmark::where('user_id', $authUser->id)
                 ->whereIn('media_id', $momentIds)
                 ->pluck('media_id')
                 ->flip()
                 ->all();
-            $followingIds = \DB::table('follows')
+            $followingIds = DB::table('follows')
                 ->where('follower_id', $authUser->id)
                 ->whereIn('following_id', $creatorIds)
                 ->pluck('following_id')
@@ -100,7 +108,7 @@ class MomentController extends Controller
         $user = $request->user() ?? auth('sanctum')->user();
         $accessInfo = $this->contentAccessService->getAccessInfo($user, $media);
 
-        if (!$accessInfo['can_access']) {
+        if (! $accessInfo['can_access']) {
             return response()->json([
                 'message' => 'This content is locked.',
                 'is_ppv' => $media->is_ppv,
@@ -140,7 +148,7 @@ class MomentController extends Controller
     public function store(StoreMomentRequest $request): JsonResponse
     {
         // Posting moments requires an active paid subscription (creators are exempt)
-        if (!$request->user()->isCreator() && !$request->user()->hasSubscriptionLevel(1)) {
+        if (! $request->user()->isCreator() && ! $request->user()->hasSubscriptionLevel(1)) {
             return response()->json([
                 'message' => 'Posting moments requires an active subscription. Upgrade your plan to continue.',
                 'error_type' => 'plan_required',
@@ -179,6 +187,11 @@ class MomentController extends Controller
                 $thumbnailUrl = $this->mediaService->storeThumbnail($request->file('thumbnail'));
                 $media->update(['thumbnail_url' => $thumbnailUrl]);
             }
+
+            UserEvent::record($request->user(), EventType::MEDIA_POSTED, new MediaPostedPayload(
+                mediaType: MediaType::MOMENT,
+                provider: MediaProvider::NATIVE,
+            ));
 
             return response()->json([
                 'message' => 'Moment uploaded successfully',

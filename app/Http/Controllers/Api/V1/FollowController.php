@@ -2,9 +2,13 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\EventType;
 use App\Events\NewFollowerEvent;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\UserEvent;
+use App\Services\Achievements\Payloads\FollowerGainedPayload;
+use App\Services\Achievements\Payloads\UserFollowedPayload;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -39,6 +43,14 @@ class FollowController extends Controller
 
         // Broadcast new follower event
         broadcast(new NewFollowerEvent($currentUser, $user))->toOthers();
+
+        UserEvent::record($currentUser, EventType::USER_FOLLOWED, new UserFollowedPayload(
+            followedId: $user->id,
+        ));
+
+        UserEvent::record($user, EventType::FOLLOWER_GAINED, new FollowerGainedPayload(
+            followerId: $currentUser->id,
+        ));
 
         // Create notification for the followed user
         app(NotificationService::class)->create(

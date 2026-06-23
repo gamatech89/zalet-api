@@ -2,7 +2,12 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\EventType;
 use App\Http\Controllers\Controller;
+use App\Models\UserEvent;
+use App\Enums\MediaProvider;
+use App\Enums\MediaType;
+use App\Services\Achievements\Payloads\MediaPostedPayload;
 use App\Models\AppSetting;
 use App\Models\Media;
 use App\Services\ContentAccessService;
@@ -181,6 +186,11 @@ class ScenaController extends Controller
                 $media->update(['thumbnail_url' => $thumbnailUrl]);
             }
 
+            UserEvent::record($request->user(), EventType::MEDIA_POSTED, new MediaPostedPayload(
+                mediaType: MediaType::LONG_FORM,
+                provider: MediaProvider::NATIVE,
+            ));
+
             return response()->json([
                 'message' => 'Scena video uploaded successfully',
                 'data' => [
@@ -321,6 +331,11 @@ class ScenaController extends Controller
             'access_level' => $request->input('access_level', 'free'),
             'required_plan_level' => $request->input('required_plan_level'),
         ]);
+
+        UserEvent::record($request->user(), EventType::MEDIA_POSTED, new MediaPostedPayload(
+            mediaType: MediaType::LONG_FORM,
+            provider: MediaProvider::from($metadata['provider']),
+        ));
 
         return response()->json([
             'message' => 'Scena embed created successfully',

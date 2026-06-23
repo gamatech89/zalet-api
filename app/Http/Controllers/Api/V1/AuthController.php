@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\EventType;
 use App\Http\Controllers\Controller;
+use App\Models\UserEvent;
+use App\Services\Achievements\Payloads\DailyLoginPayload;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
 use App\Models\Subscription;
@@ -107,6 +110,8 @@ class AuthController extends Controller
         // $user->tokens()->delete();
 
         $token = $user->createToken('auth-token')->plainTextToken;
+
+        UserEvent::record($user, EventType::DAILY_LOGIN, new DailyLoginPayload());
 
         return response()->json([
             'message' => 'Login successful.',

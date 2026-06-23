@@ -9,6 +9,9 @@ use App\Models\Conversation;
 use App\Models\Gift;
 use App\Models\GiftCategory;
 use App\Models\User;
+use App\Enums\EventType;
+use App\Models\UserEvent;
+use App\Services\Achievements\Payloads\GiftSentPayload;
 use App\Services\CoinService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -105,6 +108,12 @@ class GiftController extends Controller
 
             // Broadcast to the recipient via the conversation channel
             broadcast(new MessageSentEvent($message))->toOthers();
+
+            UserEvent::record($sender, EventType::GIFT_SENT, new GiftSentPayload(
+                giftId: $gift->id,
+                recipientId: $recipient->id,
+                coinPrice: (float) $gift->coin_price,
+            ));
 
             return response()->json([
                 'message' => 'Gift sent successfully!',

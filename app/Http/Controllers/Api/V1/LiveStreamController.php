@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\EventType;
 use App\Events\StreamChatMessage;
 use App\Http\Controllers\Controller;
+use App\Models\UserEvent;
+use App\Services\Achievements\Payloads\StreamStartedPayload;
 use App\Http\Requests\CreateStreamRequest;
 use App\Models\LiveStream;
 use App\Services\LiveKitService;
@@ -143,6 +146,8 @@ class LiveStreamController extends Controller
         }
 
         $session = $stream->goLive();
+
+        UserEvent::record($request->user(), EventType::STREAM_STARTED, new StreamStartedPayload());
 
         return response()->json([
             'message' => 'Stream started successfully.',

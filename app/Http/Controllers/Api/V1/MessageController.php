@@ -13,6 +13,9 @@ use App\Models\Block;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\MessageReaction;
+use App\Enums\EventType;
+use App\Models\UserEvent;
+use App\Services\Achievements\Payloads\MessageSentPayload;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -106,6 +109,10 @@ class MessageController extends Controller
 
         // Broadcast message to other participants
         broadcast(new MessageSentEvent($message))->toOthers();
+
+        UserEvent::record($request->user(), EventType::MESSAGE_SENT, new MessageSentPayload(
+            conversationId: $conversation->id,
+        ));
 
         // Parse @mentions and notify mentioned participants
         if ($request->content && preg_match_all('/@([\w]+)/', $request->content, $matches)) {

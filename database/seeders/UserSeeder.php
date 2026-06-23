@@ -21,6 +21,7 @@ class UserSeeder extends Seeder
                 'password' => 'password',
                 'role' => 'admin',
                 'is_legacy_founder' => true,
+                'email_verified_at' => now(),
             ]
         );
         $admin->profile()->firstOrCreate([]);

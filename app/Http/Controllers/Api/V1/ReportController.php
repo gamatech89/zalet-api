@@ -81,9 +81,20 @@ class ReportController extends Controller
             ->latest()
             ->paginate(20);
 
+        $rawCounts = Report::selectRaw('status, COUNT(*) as count')
+            ->groupBy('status')
+            ->pluck('count', 'status');
+
+        $counts = [
+            'pending'   => (int) ($rawCounts['pending'] ?? 0),
+            'reviewed'  => (int) ($rawCounts['reviewed'] ?? 0),
+            'dismissed' => (int) ($rawCounts['dismissed'] ?? 0),
+        ];
+
         return response()->json([
-            'data' => $reports->map(fn($r) => $this->formatReport($r)),
-            'meta' => [
+            'data'   => $reports->map(fn($r) => $this->formatReport($r)),
+            'counts' => $counts,
+            'meta'   => [
                 'current_page' => $reports->currentPage(),
                 'last_page'    => $reports->lastPage(),
                 'total'        => $reports->total(),

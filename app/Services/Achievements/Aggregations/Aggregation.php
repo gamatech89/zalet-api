@@ -24,7 +24,7 @@ abstract class Aggregation
 
     protected function buildQuery(User $user, EventType $eventType): Builder
     {
-        $query = $user->events()->where('type', $eventType->value);
+        $query = $user->events()->where('type', $eventType->value)->getQuery();
 
         foreach ($this->criteria as $criterion) {
             $query = $criterion->apply($query);

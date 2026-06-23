@@ -4,17 +4,18 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\EventType;
 use App\Http\Controllers\Controller;
-use App\Models\UserEvent;
-use App\Services\Achievements\Payloads\DailyLoginPayload;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
+use App\Models\UserEvent;
+use App\Services\Achievements\Payloads\DailyLoginPayload;
 use App\Services\FounderVerificationService;
 use Carbon\Carbon;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -49,14 +50,14 @@ class AuthController extends Controller
         $freePlan = SubscriptionPlan::where('slug', 'free')->where('level', 0)->first();
         if ($freePlan) {
             Subscription::create([
-                'user_id'              => $user->id,
+                'user_id' => $user->id,
                 'subscription_plan_id' => $freePlan->id,
-                'billing_cycle'        => 'monthly',
-                'price_paid'           => 0,
-                'starts_at'            => Carbon::now(),
-                'ends_at'              => Carbon::now()->addYears(100),
-                'status'               => 'active',
-                'auto_renew'           => false,
+                'billing_cycle' => 'monthly',
+                'price_paid' => 0,
+                'starts_at' => Carbon::now(),
+                'ends_at' => Carbon::now()->addYears(100),
+                'status' => 'active',
+                'auto_renew' => false,
             ]);
         }
 
@@ -87,7 +88,7 @@ class AuthController extends Controller
      */
     public function login(LoginRequest $request): JsonResponse
     {
-        if (!Auth::attempt($request->only('email', 'password'))) {
+        if (! Auth::attempt($request->only('email', 'password'))) {
             return response()->json([
                 'message' => 'Invalid credentials.',
             ], 401);
@@ -97,6 +98,7 @@ class AuthController extends Controller
 
         if ($user->isSuspended()) {
             $until = $user->suspended_until->format('d.m.Y H:i');
+
             return response()->json([
                 'message' => "Nalog je privremeno suspendovan do {$until}.",
                 'suspended_until' => $user->suspended_until->toIso8601String(),
@@ -111,7 +113,7 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth-token')->plainTextToken;
 
-        UserEvent::record($user, EventType::DAILY_LOGIN, new DailyLoginPayload());
+        UserEvent::record($user, EventType::DAILY_LOGIN, new DailyLoginPayload);
 
         return response()->json([
             'message' => 'Login successful.',
@@ -124,13 +126,13 @@ class AuthController extends Controller
      * Verify email address via signed link from email.
      * GET /api/v1/auth/verify-email/{id}/{hash}
      */
-    public function verifyEmail(Request $request, string $id, string $hash): \Illuminate\Http\RedirectResponse
+    public function verifyEmail(Request $request, string $id, string $hash): RedirectResponse
     {
         $frontendUrl = rtrim(env('FRONTEND_URL', 'https://zaletyu.com'), '/');
 
         $user = User::findOrFail($id);
 
-        if (!hash_equals(sha1($user->getEmailForVerification()), $hash)) {
+        if (! hash_equals(sha1($user->getEmailForVerification()), $hash)) {
             return redirect("{$frontendUrl}/verify-email?error=invalid");
         }
 

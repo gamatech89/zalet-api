@@ -38,7 +38,7 @@ class BoardPostController extends Controller
         $query = $board->posts()
             ->active()
             ->approved()
-            ->with(['user:id,username,role', 'user.profile:id,user_id,avatar_url', 'place'])
+            ->with(['user:id,username,name,role', 'user.profile:id,user_id,avatar_url', 'place'])
             ->withCount('comments');
 
         // Category filter
@@ -145,7 +145,7 @@ class BoardPostController extends Controller
             ]);
         });
 
-        $post->load(['user:id,username,role', 'user.profile:id,user_id,avatar_url', 'place']);
+        $post->load(['user:id,username,name,role', 'user.profile:id,user_id,avatar_url', 'place']);
 
         $message = $status === 'pending'
             ? 'Post submitted for review. It will appear after admin approval.'
@@ -167,10 +167,10 @@ class BoardPostController extends Controller
         abort_if($post->board_id !== $board->id, 404);
 
         $post->load([
-            'user:id,username,role',
+            'user:id,username,name,role',
             'user.profile:id,user_id,avatar_url,hometown_city,hometown_country,current_city,current_country',
             'comments' => fn($q) => $q->orderBy('created_at')->limit(50),
-            'comments.user:id,username,role',
+            'comments.user:id,username,name,role',
             'comments.user.profile:id,user_id,avatar_url',
         ]);
         $post->loadCount('comments');
@@ -251,7 +251,7 @@ class BoardPostController extends Controller
             'body' => $request->input('body'),
         ]);
 
-        $comment->load(['user:id,username,role', 'user.profile:id,user_id,avatar_url']);
+        $comment->load(['user:id,username,name,role', 'user.profile:id,user_id,avatar_url']);
 
         return response()->json([
             'message' => 'Comment added.',

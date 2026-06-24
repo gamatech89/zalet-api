@@ -31,6 +31,11 @@ class MediaComment extends Model
 
     public function replies(): HasMany
     {
-        return $this->hasMany(self::class, 'parent_id')->with('user:id,username')->latest();
+        return $this->hasMany(self::class, 'parent_id')->with('user:id,username')->withCount('likes')->latest();
+    }
+
+    public function likes(): HasMany
+    {
+        return $this->hasMany(MediaCommentLike::class, 'comment_id');
     }
 }

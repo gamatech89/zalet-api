@@ -17,14 +17,43 @@ class MediaCommentController extends Controller
      */
     public function index(Request $request, Media $media): JsonResponse
     {
+        $authUser = $request->user() ?? auth('sanctum')->user();
+
         $comments = MediaComment::where('media_id', $media->id)
             ->whereNull('parent_id')
-            ->with(['user:id,username', 'replies.user:id,username'])
+            ->with(['user:id,username', 'replies' => fn ($q) => $q->with('user:id,username')->withCount('likes')->latest()])
+            ->withCount('likes')
             ->latest()
             ->paginate($request->input('per_page', 15));
 
+        $commentIds = collect($comments->items())->pluck('id')->all();
+        $likedIds = [];
+        if ($authUser && !empty($commentIds)) {
+            $allIds = collect($comments->items())
+                ->flatMap(fn ($c) => array_merge([$c->id], $c->replies->pluck('id')->all()))
+                ->all();
+            $likedIds = \App\Models\MediaCommentLike::where('user_id', $authUser->id)
+                ->whereIn('comment_id', $allIds)
+                ->pluck('comment_id')
+                ->flip()
+                ->all();
+        }
+
+        $items = collect($comments->items())->map(function ($c) use ($likedIds) {
+            $arr = $c->toArray();
+            $arr['likes_count'] = $c->likes_count ?? 0;
+            $arr['is_liked'] = isset($likedIds[$c->id]);
+            $arr['replies'] = collect($c->replies)->map(function ($r) use ($likedIds) {
+                $ra = $r->toArray();
+                $ra['likes_count'] = $r->likes_count ?? 0;
+                $ra['is_liked'] = isset($likedIds[$r->id]);
+                return $ra;
+            })->values()->all();
+            return $arr;
+        });
+
         return response()->json([
-            'data' => $comments->items(),
+            'data' => $items,
             'meta' => [
                 'current_page' => $comments->currentPage(),
                 'last_page' => $comments->lastPage(),
@@ -81,6 +110,40 @@ class MediaCommentController extends Controller
         return response()->json([
             'data' => $comment,
         ], 201);
+    }
+
+    /**
+     * Toggle like on a comment.
+     * POST /api/v1/media/{media}/comments/{comment}/like
+     */
+    public function toggleLike(Request $request, Media $media, MediaComment $comment): JsonResponse
+    {
+        if ($comment->media_id !== $media->id) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        $userId = $request->user()->id;
+        $existing = \App\Models\MediaCommentLike::where('user_id', $userId)
+            ->where('comment_id', $comment->id)
+            ->first();
+
+        if ($existing) {
+            $existing->delete();
+            $liked = false;
+        } else {
+            \App\Models\MediaCommentLike::create([
+                'user_id' => $userId,
+                'comment_id' => $comment->id,
+            ]);
+            $liked = true;
+        }
+
+        $likesCount = \App\Models\MediaCommentLike::where('comment_id', $comment->id)->count();
+
+        return response()->json([
+            'liked' => $liked,
+            'likes_count' => $likesCount,
+        ]);
     }
 
     /**

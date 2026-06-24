@@ -25,7 +25,7 @@ class MomentController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Media::moments()->with('user:id,username')->withCount('comments');
+        $query = Media::moments()->with('user:id,username')->withCount(['comments', 'likes']);
 
         if ($request->has('user_id')) {
             $query->where('user_id', $request->input('user_id'));
@@ -116,10 +116,21 @@ class MomentController extends Controller
         }
 
         $media->load('user:id,username');
+        $media->loadCount(['likes', 'comments']);
+
+        $isLiked = false;
+        $isBookmarked = false;
+        $isFollowing = false;
+        if ($user) {
+            $isLiked = \App\Models\MediaLike::where('user_id', $user->id)->where('media_id', $media->id)->exists();
+            $isBookmarked = \App\Models\MediaBookmark::where('user_id', $user->id)->where('media_id', $media->id)->exists();
+            $isFollowing = \DB::table('follows')->where('follower_id', $user->id)->where('following_id', $media->user_id)->exists();
+        }
 
         return response()->json([
             'data' => [
                 'id' => $media->id,
+                'type' => 'moment',
                 'title' => $media->title,
                 'description' => $media->description,
                 'url' => $this->mediaService->getMediaUrl($media),
@@ -127,7 +138,12 @@ class MomentController extends Controller
                 'is_ppv' => $media->is_ppv,
                 'price_coins' => $media->price_coins,
                 'access_level' => $media->access_level,
-                'user' => $media->user,
+                'likes_count' => $media->likes_count ?? 0,
+                'comments_count' => $media->comments_count ?? 0,
+                'is_liked' => $isLiked,
+                'is_bookmarked' => $isBookmarked,
+                'is_following' => $isFollowing,
+                'user' => $media->user ? ['id' => $media->user->id, 'username' => $media->user->username] : null,
                 'created_at' => $media->created_at,
                 'access_info' => $accessInfo,
             ],

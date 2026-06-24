@@ -258,6 +258,7 @@ Route::prefix('v1')->group(function () {
                 Route::get('/media/{media}/comments', [\App\Http\Controllers\Api\V1\MediaCommentController::class, 'index']);
                 Route::post('/media/{media}/comments', [\App\Http\Controllers\Api\V1\MediaCommentController::class, 'store']);
                 Route::delete('/media/{media}/comments/{comment}', [\App\Http\Controllers\Api\V1\MediaCommentController::class, 'destroy']);
+                Route::post('/media/{media}/comments/{comment}/like', [\App\Http\Controllers\Api\V1\MediaCommentController::class, 'toggleLike']);
                 // Subscriptions (global plan-based)
                 Route::prefix('subscriptions')->group(function () {
                     Route::post('/', [SubscriptionController::class , 'subscribe']);

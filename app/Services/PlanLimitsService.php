@@ -71,6 +71,10 @@ class PlanLimitsService
      */
     public function canPostMoment(User $user): bool|string
     {
+        if ($user->isCreator()) {
+            return true;
+        }
+
         $limits = $this->getLimits($user);
         $maxMoments = $limits['max_moments'];
 

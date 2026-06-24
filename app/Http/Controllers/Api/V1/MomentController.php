@@ -25,7 +25,7 @@ class MomentController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Media::moments()->with('user:id,username')->withCount(['comments', 'likes']);
+        $query = Media::moments()->with(['user:id,username', 'user.profile:user_id,avatar_url'])->withCount(['comments', 'likes']);
 
         if ($request->has('user_id')) {
             $query->where('user_id', $request->input('user_id'));
@@ -76,7 +76,7 @@ class MomentController extends Controller
                 'is_liked' => isset($likedIds[$m->id]),
                 'is_bookmarked' => isset($bookmarkedIds[$m->id]),
                 'is_following' => isset($followingIds[$m->user_id]),
-                'user' => $m->user ? ['id' => $m->user->id, 'username' => $m->user->username] : null,
+                'user' => $m->user ? ['id' => $m->user->id, 'username' => $m->user->username, 'avatar_url' => $m->user->profile?->avatar_url] : null,
                 'created_at' => $m->created_at,
             ]),
             'meta' => [
@@ -115,7 +115,7 @@ class MomentController extends Controller
             ], 403);
         }
 
-        $media->load('user:id,username');
+        $media->load(['user:id,username', 'user.profile:user_id,avatar_url']);
         $media->loadCount(['likes', 'comments']);
 
         $isLiked = false;
@@ -143,7 +143,7 @@ class MomentController extends Controller
                 'is_liked' => $isLiked,
                 'is_bookmarked' => $isBookmarked,
                 'is_following' => $isFollowing,
-                'user' => $media->user ? ['id' => $media->user->id, 'username' => $media->user->username] : null,
+                'user' => $media->user ? ['id' => $media->user->id, 'username' => $media->user->username, 'avatar_url' => $media->user->profile?->avatar_url] : null,
                 'created_at' => $media->created_at,
                 'access_info' => $accessInfo,
             ],

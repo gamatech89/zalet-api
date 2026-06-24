@@ -52,11 +52,23 @@ class WalletController extends Controller
         $user = $request->user();
         $wallet = $this->coinService->ensureWallet($user);
 
-        $transactions = $wallet->incomingTransactions()
-            ->orWhere('from_wallet_id', $wallet->id)
+        $walletId = $wallet->id;
+
+        $query = \App\Models\Transaction::where(function ($q) use ($walletId) {
+                $q->where('to_wallet_id', $walletId)
+                  ->orWhere('from_wallet_id', $walletId);
+            })
             ->with(['gift', 'fromWallet.user:id,username', 'toWallet.user:id,username'])
-            ->orderBy('created_at', 'desc')
-            ->paginate($request->input('per_page', 20));
+            ->orderBy('created_at', 'desc');
+
+        if ($request->filled('type')) {
+            $query->where('type', $request->input('type'));
+        }
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
+        $transactions = $query->paginate($request->input('per_page', 20));
 
         return response()->json([
             'data' => $transactions->items(),

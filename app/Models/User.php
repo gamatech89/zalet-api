@@ -49,6 +49,7 @@ class User extends Authenticatable implements FilamentUser, HasName, MustVerifyE
         'is_active',
         'suspended_until',
         'suspension_reason',
+        'name_changed_at',
     ];
 
     protected $hidden = [
@@ -60,7 +61,8 @@ class User extends Authenticatable implements FilamentUser, HasName, MustVerifyE
     {
         return [
             'email_verified_at' => 'datetime',
-            'suspended_until'   => 'datetime',
+            'suspended_until'    => 'datetime',
+            'name_changed_at'   => 'datetime',
             'password' => 'hashed',
             'legacy_id' => 'integer',
             'is_legacy_founder' => 'boolean',

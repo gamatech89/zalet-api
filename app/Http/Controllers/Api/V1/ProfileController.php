@@ -47,9 +47,28 @@ class ProfileController extends Controller
 
         $profile->update($request->validated());
 
-        // Update display name on user if provided
+        // Update display name on user if provided (rate-limited to once per 24h)
         if ($request->has('name')) {
-            $user->update(['name' => $request->input('name')]);
+            $newName = $request->input('name');
+            $nameChanged = $newName !== $user->name;
+
+            if ($nameChanged && $user->name_changed_at) {
+                $hoursLeft = ceil($user->name_changed_at->diffInMinutes(now()) < 1440
+                    ? (1440 - $user->name_changed_at->diffInMinutes(now())) / 60
+                    : 0);
+
+                if ($user->name_changed_at->diffInHours(now()) < 24) {
+                    $hoursLeft = (int) ceil(24 - $user->name_changed_at->diffInRealHours(now()));
+                    return response()->json([
+                        'message' => "Nick možeš promeniti jednom u 24 sata. Pokušaj ponovo za {$hoursLeft} " . ($hoursLeft === 1 ? 'sat' : ($hoursLeft < 5 ? 'sata' : 'sati')) . '.',
+                    ], 422);
+                }
+            }
+
+            $user->update([
+                'name' => $newName,
+                'name_changed_at' => $nameChanged ? now() : $user->name_changed_at,
+            ]);
         }
 
         return response()->json([

@@ -126,6 +126,18 @@ class User extends Authenticatable implements FilamentUser, HasName, MustVerifyE
         return $this->hasMany(CreatorRequest::class);
     }
 
+    public function events(): HasMany
+    {
+        return $this->hasMany(UserEvent::class);
+    }
+
+    public function achievementTiers(): BelongsToMany
+    {
+        return $this->belongsToMany(AchievementTier::class, 'user_achievement_tiers')
+            ->withPivot('progress', 'unlocked_at', 'collected_at')
+            ->withTimestamps();
+    }
+
     // === Subscription Helpers ===
 
     /**

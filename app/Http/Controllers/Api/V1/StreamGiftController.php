@@ -8,6 +8,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\SendStreamGiftRequest;
 use App\Models\Gift;
 use App\Models\LiveStream;
+use App\Enums\EventType;
+use App\Models\UserEvent;
+use App\Services\Achievements\Payloads\GiftSentPayload;
 use App\Services\CoinService;
 use Illuminate\Http\JsonResponse;
 
@@ -59,6 +62,12 @@ class StreamGiftController extends Controller
 
             // Broadcast the gift event to the stream channel
             broadcast(new GiftSentEvent($sender, $streamer, $gift, $session))->toOthers();
+
+            UserEvent::record($sender, EventType::GIFT_SENT, new GiftSentPayload(
+                giftId: $gift->id,
+                recipientId: $streamer->id,
+                coinPrice: (float) $gift->coin_price,
+            ));
 
             // Update stream goals if any are set
             $goals = $liveStream->goals ?? [];

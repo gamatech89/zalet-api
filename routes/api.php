@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AchievementController;
 use App\Http\Controllers\Api\V1\AdminController;
 use App\Http\Controllers\Api\V1\AdminGiftController;
 use App\Http\Controllers\Api\V1\AdminSettingsController;
@@ -273,6 +274,10 @@ Route::prefix('v1')->group(function () {
                     return response()->json($service->getPlanInfo($request->user()));
                 });
 
+                // Achievements
+                Route::get('/achievements', [AchievementController::class, 'userAchievements']);
+                Route::post('/achievements/{achievementTier}/collect', [AchievementController::class, 'collect']);
+
                 // Creator Requests (become a creator)
                 Route::post('/creator-requests', [CreatorRequestController::class , 'store']);
                 Route::get('/creator-requests/mine', [CreatorRequestController::class , 'show']);
@@ -442,6 +447,16 @@ Route::prefix('v1')->group(function () {
                 Route::post('/coin-packages', [CoinPackageController::class, 'store']);
                 Route::put('/coin-packages/{package}', [CoinPackageController::class, 'update']);
                 Route::delete('/coin-packages/{package}', [CoinPackageController::class, 'destroy']);
+
+                // Achievements
+                Route::prefix('achievements')->group(function () {
+                    Route::get('/', [AchievementController::class, 'index']);
+                    Route::get('/fields', [AchievementController::class, 'fields']);
+                    Route::post('/', [AchievementController::class, 'store']);
+                    Route::get('/{achievement}', [AchievementController::class, 'show']);
+                    Route::put('/{achievement}', [AchievementController::class, 'update']);
+                    Route::delete('/{achievement}', [AchievementController::class, 'destroy']);
+                });
 
                 // Economy Settings
                 Route::get('/settings', [AdminSettingsController::class, 'index']);

@@ -387,9 +387,10 @@ class RaiffeisenPaymentService
             // Coin deposit flow
             $this->coinService->confirmDeposit($transaction);
 
-            // Auto-save card if Recurrent token (or UPCToken) is present
-            $hasToken = !empty($data['Recurrent']) || !empty($data['UPCToken']);
-            if ($hasToken && !empty($data['ProxyPan'])) {
+            // UPCToken = card token (needed for payByToken); Recurrent = Visa/MC tx reference (different thing)
+            $hasUpcToken = !empty($data['UPCToken']);
+            $hasRecurrent = !empty($data['Recurrent']);
+            if (($hasUpcToken || $hasRecurrent) && !empty($data['ProxyPan'])) {
                 $this->saveCardFromWebhook($data, $transaction->toWallet?->user_id ?? '');
             }
 
@@ -397,7 +398,9 @@ class RaiffeisenPaymentService
                 'order_id' => $orderId,
                 'transaction_id' => $transaction->id,
                 'approval_code' => $approvalCode,
-                'has_token' => $hasToken,
+                'has_upc_token' => $hasUpcToken,
+                'has_recurrent' => $hasRecurrent,
+                'upc_token_exp' => $data['UPCTokenExp'] ?? null,
             ]);
 
             return $this->buildWebhookResponse($data, 'approve', 'ok');
@@ -426,8 +429,9 @@ class RaiffeisenPaymentService
      */
     public function saveCardFromWebhook(array $data, string $userId): ?PaymentMethod
     {
-        // Raiffeisen sends 'Recurrent' as the card token; 'UPCToken' is an alias in older docs
-        $token = $data['Recurrent'] ?? $data['UPCToken'] ?? null;
+        // UPCToken is the actual card token for future payments.
+        // Recurrent is a Visa/MC transaction reference ID — different thing, not usable for payByToken.
+        $token = $data['UPCToken'] ?? $data['Recurrent'] ?? null;
         $proxyPan = $data['ProxyPan'] ?? null;
 
         if (!$token || !$userId) {
@@ -659,12 +663,15 @@ class RaiffeisenPaymentService
             return $this->buildWebhookResponse($data, 'reverse', 'Invalid session data');
         }
 
-        $hasToken = !empty($data['Recurrent']) || !empty($data['UPCToken']);
-        if ($hasToken && !empty($data['ProxyPan'])) {
+        $hasUpcToken = !empty($data['UPCToken']);
+        $hasRecurrent = !empty($data['Recurrent']);
+        if (($hasUpcToken || $hasRecurrent) && !empty($data['ProxyPan'])) {
             $this->saveCardFromWebhook($data, $userId);
             Log::info('Card saved via registration payment', [
                 'order_id' => $orderId,
                 'user_id' => $userId,
+                'has_upc_token' => $hasUpcToken,
+                'has_recurrent' => $hasRecurrent,
             ]);
         }
 

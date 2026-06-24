@@ -18,6 +18,7 @@ class Board extends Model
         'country_code',
         'city',
         'description',
+        'rules',
         'image_url',
         'is_active',
         'is_public',
@@ -31,6 +32,7 @@ class Board extends Model
             'is_active' => 'boolean',
             'is_public' => 'boolean',
             'is_featured' => 'boolean',
+            'rules' => 'array',
         ];
     }
 

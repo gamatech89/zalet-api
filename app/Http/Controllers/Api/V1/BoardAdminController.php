@@ -15,6 +15,35 @@ use Illuminate\Support\Str;
 class BoardAdminController extends Controller
 {
     // =============================================
+    // BOARD INFO
+    // =============================================
+
+    /**
+     * Update board info (name, description, visibility, rules).
+     *
+     * PATCH /api/v1/boards/{board}
+     */
+    public function updateBoard(Request $request, Board $board): JsonResponse
+    {
+        $this->authorizeAdmin($request, $board);
+
+        $validated = $request->validate([
+            'name'        => 'sometimes|string|max:100',
+            'description' => 'sometimes|string|max:1000',
+            'is_public'   => 'sometimes|boolean',
+            'rules'       => 'sometimes|array',
+            'rules.*'     => 'string|max:300',
+        ]);
+
+        $board->update($validated);
+
+        return response()->json([
+            'message' => 'Board updated.',
+            'data'    => $board->fresh(),
+        ]);
+    }
+
+    // =============================================
     // CATEGORIES
     // =============================================
 

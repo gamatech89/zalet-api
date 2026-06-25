@@ -16,7 +16,7 @@ return [
     0 => [
         'max_moments'                   => 10,
         'max_moment_duration_seconds'   => 30,
-        'max_groups'                    => 3,
+        'max_groups'                    => 1,
         'max_community_posts_per_month' => 0,      // cannot post for free
         'community_post_coin_cost'      => 5,       // but can pay ZC per post
         'can_watch_premium'             => false,
@@ -26,7 +26,7 @@ return [
 
     // Premium — level 1
     1 => [
-        'max_moments'                   => 50,
+        'max_moments'                   => 10,
         'max_moment_duration_seconds'   => 60,
         'max_groups'                    => null,     // unlimited
         'max_community_posts_per_month' => 10,

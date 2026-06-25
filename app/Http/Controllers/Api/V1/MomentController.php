@@ -25,13 +25,21 @@ class MomentController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $authUser = $request->user() ?? auth('sanctum')->user();
+
         $query = Media::moments()->with(['user:id,username', 'user.profile:user_id,avatar_url'])->withCount(['comments', 'likes']);
 
         if ($request->has('user_id')) {
-            $query->where('user_id', $request->input('user_id'));
+            $requestedUserId = $request->input('user_id');
+            $query->where('user_id', $requestedUserId);
+            // On a user's own profile, show their pending moments too
+            if (!$authUser || $authUser->id !== $requestedUserId) {
+                $query->where('is_approved', true);
+            }
+        } else {
+            // Public feed: only approved moments
+            $query->where('is_approved', true);
         }
-
-        $authUser = $request->user() ?? auth('sanctum')->user();
 
         $moments = $query->latest()
             ->paginate($request->input('per_page', 20));
@@ -190,14 +198,23 @@ class MomentController extends Controller
                 requiredPlanLevel: $request->input('required_plan_level')
             );
 
+            // Creators and admins are approved immediately; premium users require admin review
+            $media->update([
+                'is_approved' => $request->user()->isCreator() ? true : null,
+            ]);
+
             // Store thumbnail if provided
             if ($request->hasFile('thumbnail')) {
                 $thumbnailUrl = $this->mediaService->storeThumbnail($request->file('thumbnail'));
                 $media->update(['thumbnail_url' => $thumbnailUrl]);
             }
 
+            $isPending = $media->is_approved === null;
+
             return response()->json([
-                'message' => 'Moment uploaded successfully',
+                'message' => $isPending
+                    ? 'Moment je uploadovan i čeka odobrenje admina.'
+                    : 'Moment uploaded successfully',
                 'data' => [
                     'id' => $media->id,
                     'title' => $media->title,
@@ -205,6 +222,8 @@ class MomentController extends Controller
                     'thumbnail_url' => $media->thumbnail_url,
                     'is_ppv' => $media->is_ppv,
                     'price_coins' => $media->price_coins,
+                    'is_approved' => $media->is_approved,
+                    'pending_approval' => $isPending,
                 ],
             ], 201);
         } catch (\RuntimeException $e) {

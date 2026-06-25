@@ -27,12 +27,14 @@ class Media extends Model
         'price_coins',
         'access_level',
         'required_plan_level',
+        'is_approved',
     ];
 
     protected function casts(): array
     {
         return [
             'size_bytes' => 'integer',
+            'is_approved' => 'boolean',
             'is_ppv' => 'boolean',
             'price_coins' => 'decimal:2',
             'required_plan_level' => 'integer',

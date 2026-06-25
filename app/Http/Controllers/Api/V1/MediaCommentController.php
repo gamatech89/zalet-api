@@ -69,6 +69,14 @@ class MediaCommentController extends Controller
      */
     public function store(Request $request, Media $media): JsonResponse
     {
+        $user = $request->user();
+        if (!$user->isCreator() && !$user->hasSubscriptionLevel(1)) {
+            return response()->json([
+                'message' => 'Komentarisanje je dostupno samo pretplatnicima. Pretplati se na Premium plan.',
+                'error_type' => 'plan_required',
+            ], 403);
+        }
+
         $request->validate([
             'body' => 'required|string|max:2000',
             'parent_id' => 'nullable|uuid|exists:media_comments,id',

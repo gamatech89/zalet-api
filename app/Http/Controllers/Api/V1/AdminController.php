@@ -448,4 +448,89 @@ class AdminController extends Controller
 
         return response()->json(['message' => 'Community rejected and removed.']);
     }
+
+    /**
+     * List moments pending admin approval (is_approved IS NULL).
+     * GET /api/v1/admin/moments/pending
+     */
+    public function pendingMoments(Request $request): JsonResponse
+    {
+        $moments = Media::moments()
+            ->whereNull('is_approved')
+            ->with(['user:id,username', 'user.profile:user_id,avatar_url'])
+            ->orderBy('created_at', 'asc')
+            ->paginate(20);
+
+        return response()->json([
+            'data' => $moments->map(fn ($m) => [
+                'id' => $m->id,
+                'title' => $m->title,
+                'thumbnail_url' => $m->thumbnail_url,
+                'user' => [
+                    'id' => $m->user->id,
+                    'username' => $m->user->username,
+                    'avatar_url' => $m->user->profile?->avatar_url,
+                ],
+                'created_at' => $m->created_at->toIso8601String(),
+            ]),
+            'meta' => [
+                'current_page' => $moments->currentPage(),
+                'last_page' => $moments->lastPage(),
+                'per_page' => $moments->perPage(),
+                'total' => $moments->total(),
+            ],
+        ]);
+    }
+
+    /**
+     * Approve a moment.
+     * POST /api/v1/admin/moments/{media}/approve
+     */
+    public function approveMoment(Media $media): JsonResponse
+    {
+        if ($media->type !== 'moment') {
+            return response()->json(['message' => 'Not a moment.'], 422);
+        }
+
+        $media->update(['is_approved' => true]);
+
+        app(\App\Services\NotificationService::class)->create(
+            $media->user,
+            'system',
+            'Moment odobren',
+            "Tvoj moment \"{$media->title}\" je odobren i sada je vidljiv svima.",
+            ['media_id' => $media->id],
+        );
+
+        return response()->json(['message' => 'Moment approved.']);
+    }
+
+    /**
+     * Reject (delete) a moment.
+     * POST /api/v1/admin/moments/{media}/reject
+     */
+    public function rejectMoment(Request $request, Media $media): JsonResponse
+    {
+        if ($media->type !== 'moment') {
+            return response()->json(['message' => 'Not a moment.'], 422);
+        }
+
+        $request->validate([
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $reason = $request->input('reason', 'Sadržaj nije u skladu sa pravilima platforme.');
+
+        app(\App\Services\NotificationService::class)->create(
+            $media->user,
+            'system',
+            'Moment odbijen',
+            "Tvoj moment \"{$media->title}\" je odbijen. Razlog: {$reason}",
+            ['media_id' => $media->id],
+        );
+
+        app(\App\Services\MediaService::class)->deleteMedia($media);
+
+        return response()->json(['message' => 'Moment rejected and deleted.']);
+    }
 }

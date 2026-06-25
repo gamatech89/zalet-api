@@ -211,7 +211,7 @@ class ConversationController extends Controller
     {
         Gate::authorize('view', $conversation);
 
-        $conversation->load(['users:id,username,name']);
+        $conversation->load(['users:id,username,name', 'pinnedMessage.sender:id,username']);
 
         $myUser = $conversation->users->firstWhere('id', $request->user()->id);
 
@@ -230,6 +230,12 @@ class ConversationController extends Controller
                     'name' => $u->name,
                     'role' => $u->pivot?->role,
                 ]),
+                'pinned_message' => $conversation->pinnedMessage ? [
+                    'id' => $conversation->pinnedMessage->id,
+                    'content' => $conversation->pinnedMessage->content,
+                    'message_type' => $conversation->pinnedMessage->message_type,
+                    'sender' => ['id' => $conversation->pinnedMessage->sender->id, 'username' => $conversation->pinnedMessage->sender->username],
+                ] : null,
                 'created_at' => $conversation->created_at->toIso8601String(),
             ],
         ]);
@@ -567,6 +573,15 @@ class ConversationController extends Controller
             ]);
         }
 
+        $planLimitsService = app(PlanLimitsService::class);
+        $canJoin = $planLimitsService->canJoinGroup($user);
+        if ($canJoin !== true) {
+            return response()->json([
+                'message' => $canJoin,
+                'error_type' => 'plan_limit',
+            ], 403);
+        }
+
         $conversation->users()->attach($user->id, ['joined_at' => now(), 'role' => 'member']);
 
         return response()->json([
@@ -644,5 +659,66 @@ class ConversationController extends Controller
         $conversation->touch();
 
         broadcast(new MessageSentEvent($message));
+    }
+
+    /**
+     * Pin a message in a group conversation (owner/admin only).
+     * POST /api/v1/conversations/{conversation}/pin-message
+     */
+    public function pinMessage(Request $request, Conversation $conversation): JsonResponse
+    {
+        if (!$conversation->is_group) {
+            return response()->json(['message' => 'Only group chats support pinned messages.'], 422);
+        }
+
+        Gate::authorize('update', $conversation);
+
+        $validated = $request->validate([
+            'message_id' => ['required', 'uuid', 'exists:messages,id'],
+        ]);
+
+        $message = $conversation->messages()->findOrFail($validated['message_id']);
+
+        $conversation->update(['pinned_message_id' => $message->id]);
+
+        $actor = $this->displayName($request->user());
+        $preview = mb_strimwidth($message->content ?? '[medija]', 0, 60, '...');
+        $this->postSystemMessage($conversation, $request->user()->id, "{$actor} je pinao poruku: \"{$preview}\"");
+
+        $message->load('sender:id,username');
+
+        return response()->json([
+            'message' => 'Message pinned.',
+            'data' => [
+                'id' => $message->id,
+                'content' => $message->content,
+                'message_type' => $message->message_type,
+                'sender' => ['id' => $message->sender->id, 'username' => $message->sender->username],
+            ],
+        ]);
+    }
+
+    /**
+     * Unpin the current pinned message (owner/admin only).
+     * DELETE /api/v1/conversations/{conversation}/pin-message
+     */
+    public function unpinMessage(Request $request, Conversation $conversation): JsonResponse
+    {
+        if (!$conversation->is_group) {
+            return response()->json(['message' => 'Only group chats support pinned messages.'], 422);
+        }
+
+        Gate::authorize('update', $conversation);
+
+        if (!$conversation->pinned_message_id) {
+            return response()->json(['message' => 'No pinned message.'], 422);
+        }
+
+        $conversation->update(['pinned_message_id' => null]);
+
+        $actor = $this->displayName($request->user());
+        $this->postSystemMessage($conversation, $request->user()->id, "{$actor} je uklonio/la pinanu poruku.");
+
+        return response()->json(['message' => 'Message unpinned.']);
     }
 }

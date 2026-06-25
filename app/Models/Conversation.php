@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -18,6 +19,7 @@ class Conversation extends Model
         'is_group',
         'is_public',
         'invite_code',
+        'pinned_message_id',
     ];
 
     protected function casts(): array
@@ -53,5 +55,10 @@ class Conversation extends Model
     public function board(): HasOne
     {
         return $this->hasOne(Board::class, 'conversation_id');
+    }
+
+    public function pinnedMessage(): BelongsTo
+    {
+        return $this->belongsTo(Message::class, 'pinned_message_id');
     }
 }

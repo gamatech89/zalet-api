@@ -383,6 +383,9 @@ Route::prefix('v1')->group(function () {
                     // Leave group
                     Route::delete('/{conversation}/leave', [ConversationController::class, 'leave']);
                     Route::post('/{conversation}/read', [ConversationController::class, 'markRead']);
+                    // Pinned message
+                    Route::post('/{conversation}/pin-message', [ConversationController::class, 'pinMessage']);
+                    Route::delete('/{conversation}/pin-message', [ConversationController::class, 'unpinMessage']);
                 });
 
                 // Blocks
@@ -412,6 +415,11 @@ Route::prefix('v1')->group(function () {
                 Route::delete('/media/{media}', [AdminController::class , 'deleteMedia']);
                 Route::get('/streams', [AdminController::class , 'listStreams']);
                 Route::post('/streams/{liveStream}/end', [AdminController::class , 'endStream']);
+
+                // Moment approval
+                Route::get('/moments/pending', [AdminController::class, 'pendingMoments']);
+                Route::post('/moments/{media}/approve', [AdminController::class, 'approveMoment']);
+                Route::post('/moments/{media}/reject', [AdminController::class, 'rejectMoment']);
 
                 // Community management
                 Route::get('/communities', [AdminController::class, 'listCommunities']);

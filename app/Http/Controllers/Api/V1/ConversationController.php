@@ -211,7 +211,7 @@ class ConversationController extends Controller
     {
         Gate::authorize('view', $conversation);
 
-        $conversation->load(['users:id,username,name', 'pinnedMessage.sender:id,username']);
+        $conversation->load(['users:id,username,name', 'pinnedMessage.sender:id,username', 'bans.user:id,username,name']);
 
         $myUser = $conversation->users->firstWhere('id', $request->user()->id);
 
@@ -236,6 +236,13 @@ class ConversationController extends Controller
                     'message_type' => $conversation->pinnedMessage->message_type,
                     'sender' => ['id' => $conversation->pinnedMessage->sender->id, 'username' => $conversation->pinnedMessage->sender->username],
                 ] : null,
+                'banned_users' => $conversation->bans->map(fn ($ban) => [
+                    'id' => $ban->user->id,
+                    'username' => $ban->user->username,
+                    'name' => $ban->user->name,
+                    'banned_at' => $ban->banned_at->toIso8601String(),
+                    'reason' => $ban->reason,
+                ]),
                 'created_at' => $conversation->created_at->toIso8601String(),
             ],
         ]);

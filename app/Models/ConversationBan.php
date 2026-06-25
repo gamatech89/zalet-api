@@ -12,14 +12,21 @@ class ConversationBan extends Model
         'user_id',
         'banned_by',
         'reason',
+        'banned_until',
         'banned_at',
     ];
 
     protected function casts(): array
     {
         return [
-            'banned_at' => 'datetime',
+            'banned_at'    => 'datetime',
+            'banned_until' => 'datetime',
         ];
+    }
+
+    public function isActive(): bool
+    {
+        return $this->banned_until === null || $this->banned_until->isFuture();
     }
 
     public function conversation(): BelongsTo

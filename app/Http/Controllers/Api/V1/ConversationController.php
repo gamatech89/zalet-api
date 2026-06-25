@@ -236,13 +236,16 @@ class ConversationController extends Controller
                     'message_type' => $conversation->pinnedMessage->message_type,
                     'sender' => ['id' => $conversation->pinnedMessage->sender->id, 'username' => $conversation->pinnedMessage->sender->username],
                 ] : null,
-                'banned_users' => $conversation->bans->map(fn ($ban) => [
-                    'id' => $ban->user->id,
-                    'username' => $ban->user->username,
-                    'name' => $ban->user->name,
-                    'banned_at' => $ban->banned_at->toIso8601String(),
-                    'reason' => $ban->reason,
-                ]),
+                'banned_users' => $conversation->bans
+                    ->filter(fn ($ban) => $ban->banned_until === null || $ban->banned_until->isFuture())
+                    ->map(fn ($ban) => [
+                        'id'          => $ban->user->id,
+                        'username'    => $ban->user->username,
+                        'name'        => $ban->user->name,
+                        'banned_at'   => $ban->banned_at->toIso8601String(),
+                        'banned_until' => $ban->banned_until?->toIso8601String(),
+                        'reason'      => $ban->reason,
+                    ])->values(),
                 'created_at' => $conversation->created_at->toIso8601String(),
             ],
         ]);
@@ -373,7 +376,8 @@ class ConversationController extends Controller
 
         $validated = $request->validate([
             'user_id' => ['required', 'uuid', 'exists:users,id'],
-            'reason' => ['nullable', 'string', 'max:255'],
+            'reason'  => ['nullable', 'string', 'max:255'],
+            'hours'   => ['nullable', 'integer', 'in:1,8,24'],
         ]);
 
         $member = User::findOrFail($validated['user_id']);
@@ -395,12 +399,15 @@ class ConversationController extends Controller
         // Remove from group if they are a member
         $conversation->users()->detach($member->id);
 
+        $bannedUntil = isset($validated['hours']) ? now()->addHours($validated['hours']) : null;
+
         $conversation->bans()->updateOrCreate(
             ['user_id' => $member->id],
             [
-                'banned_by' => $request->user()->id,
-                'reason' => $validated['reason'] ?? null,
-                'banned_at' => now(),
+                'banned_by'    => $request->user()->id,
+                'reason'       => $validated['reason'] ?? null,
+                'banned_until' => $bannedUntil,
+                'banned_at'    => now(),
             ]
         );
 
@@ -569,7 +576,9 @@ class ConversationController extends Controller
 
         $user = $request->user();
 
-        if ($conversation->bans()->where('user_id', $user->id)->exists()) {
+        if ($conversation->bans()->where('user_id', $user->id)
+            ->where(fn ($q) => $q->whereNull('banned_until')->orWhere('banned_until', '>', now()))
+            ->exists()) {
             return response()->json(['message' => 'You are banned from this group.'], 403);
         }
 

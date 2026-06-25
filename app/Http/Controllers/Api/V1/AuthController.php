@@ -121,7 +121,7 @@ class AuthController extends Controller
      */
     public function verifyEmail(Request $request, string $id, string $hash): \Illuminate\Http\RedirectResponse
     {
-        $frontendUrl = rtrim(env('FRONTEND_URL', 'https://zaletyu.com'), '/');
+        $frontendUrl = rtrim(config('app.frontend_url'), '/');
 
         $user = User::findOrFail($id);
 

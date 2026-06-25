@@ -24,6 +24,9 @@ class MonetizationTest extends TestCase
         $this->buyer = User::factory()->create();
         $this->creator = User::factory()->create(['role' => 'creator']);
         $this->coinService = app(CoinService::class);
+        // Ensure wallets exist for all PPV and transfer tests
+        $this->coinService->ensureWallet($this->buyer);
+        $this->coinService->ensureWallet($this->creator);
     }
 
     // === PPV Tests ===
@@ -40,9 +43,7 @@ class MonetizationTest extends TestCase
         ]);
 
         // Give buyer some balance
-        $wallet = $this->coinService->ensureWallet($this->buyer);
-        $wallet->update(['balance' => 100.00]);
-        $this->coinService->ensureWallet($this->creator);
+        $this->buyer->wallet()->update(['balance' => 100.00]);
 
         $response = $this->actingAs($this->buyer, 'sanctum')
             ->postJson("/api/v1/media/{$media->id}/purchase");
@@ -105,9 +106,9 @@ class MonetizationTest extends TestCase
             'price_coins' => 50,
         ]);
 
-        // Create existing purchase with valid transaction
-        $buyerWallet = \App\Models\Wallet::factory()->create(['user_id' => $this->buyer->id]);
-        $creatorWallet = \App\Models\Wallet::factory()->create(['user_id' => $this->creator->id]);
+        // Create existing purchase with valid transaction (wallets already created in setUp)
+        $buyerWallet = $this->coinService->ensureWallet($this->buyer);
+        $creatorWallet = $this->coinService->ensureWallet($this->creator);
 
         $transaction = \App\Models\Transaction::create([
             'from_wallet_id' => $buyerWallet->id,
@@ -141,9 +142,7 @@ class MonetizationTest extends TestCase
             'price_coins' => 100,
         ]);
 
-        // Buyer has no balance
-        $this->coinService->ensureWallet($this->buyer);
-        $this->coinService->ensureWallet($this->creator);
+        // Buyer has no balance (wallets created in setUp)
 
         $response = $this->actingAs($this->buyer, 'sanctum')
             ->postJson("/api/v1/media/{$media->id}/purchase");

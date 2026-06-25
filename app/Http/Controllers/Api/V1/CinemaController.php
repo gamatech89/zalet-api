@@ -104,6 +104,12 @@ class CinemaController extends Controller
         $url = $request->input('url');
         $metadata = $this->embedService->extractMetadata($url);
 
+        if ($metadata === null || empty($metadata['embed_url'])) {
+            return response()->json([
+                'message' => 'URL nije prepoznat. Podržani su YouTube i Vimeo linkovi.',
+            ], 422);
+        }
+
         $media = Media::create([
             'user_id' => $request->user()->id,
             'type' => 'embed',
@@ -111,7 +117,7 @@ class CinemaController extends Controller
             'url' => $url,
             'title' => $request->input('title'),
             'description' => $request->input('description'),
-            'thumbnail_url' => $metadata['thumbnail_url'],
+            'thumbnail_url' => $metadata['thumbnail_url'] ?? null,
             'size_bytes' => 0, // Embeds have no storage cost
             'is_ppv' => $request->boolean('is_ppv'),
             'price_coins' => $request->boolean('is_ppv') ? $request->input('price_coins') : null,
@@ -156,7 +162,7 @@ class CinemaController extends Controller
         ]);
     }
 
-    private function checkPpvLimits(int $userId): void
+    private function checkPpvLimits(string $userId): void
     {
         $monthlyLimit = AppSetting::get('ppv_monthly_limit', 3);
         $thisMonthCount = Media::where('user_id', $userId)

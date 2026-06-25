@@ -12,6 +12,11 @@ use Illuminate\Support\Facades\Storage;
 
 class ProfileController extends Controller
 {
+    private function ensureProfile($user): Profile
+    {
+        return $user->profile ?? $user->profile()->firstOrCreate([]);
+    }
+
     /**
      * Get the authenticated user's profile.
      *
@@ -20,9 +25,7 @@ class ProfileController extends Controller
     public function show(Request $request): JsonResponse
     {
         $user = $request->user();
-        
-        // Ensure profile exists (auto-create if missing)
-        $profile = $user->profile ?? $user->profile()->create([]);
+        $profile = $this->ensureProfile($user);
 
         return response()->json([
             'profile' => $profile,
@@ -41,9 +44,7 @@ class ProfileController extends Controller
     public function update(UpdateProfileRequest $request): JsonResponse
     {
         $user = $request->user();
-
-        // Ensure profile exists
-        $profile = $user->profile ?? $user->profile()->create([]);
+        $profile = $this->ensureProfile($user);
 
         $profile->update($request->validated());
 
@@ -89,9 +90,7 @@ class ProfileController extends Controller
     public function uploadAvatar(UploadAvatarRequest $request): JsonResponse
     {
         $user = $request->user();
-        
-        // Ensure profile exists
-        $profile = $user->profile ?? $user->profile()->create([]);
+        $profile = $this->ensureProfile($user);
 
         // Delete old avatar if exists
         if ($profile->avatar_url) {
@@ -125,7 +124,7 @@ class ProfileController extends Controller
         ]);
 
         $user = $request->user();
-        $profile = $user->profile ?? $user->profile()->create([]);
+        $profile = $this->ensureProfile($user);
 
         // Delete old cover if exists
         if ($profile->cover_url) {

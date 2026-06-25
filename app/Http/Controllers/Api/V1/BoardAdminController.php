@@ -43,6 +43,30 @@ class BoardAdminController extends Controller
         ]);
     }
 
+    /**
+     * Update board cover image.
+     *
+     * POST /api/v1/boards/{board}/cover
+     */
+    public function updateCover(Request $request, Board $board): JsonResponse
+    {
+        $this->authorizeAdmin($request, $board);
+
+        $request->validate([
+            'cover' => 'required|image|max:5120',
+        ]);
+
+        $path = $request->file('cover')->store('board-banners', 'public');
+        $imageUrl = asset('storage/' . $path);
+
+        $board->update(['image_url' => $imageUrl]);
+
+        return response()->json([
+            'message' => 'Cover updated.',
+            'data'    => ['image_url' => $imageUrl],
+        ]);
+    }
+
     // =============================================
     // CATEGORIES
     // =============================================

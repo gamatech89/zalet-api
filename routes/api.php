@@ -323,6 +323,7 @@ Route::prefix('v1')->group(function () {
                 // Board Admin (auth required)
                 Route::prefix('boards/{board:slug}')->group(function () {
                     Route::patch('/', [BoardAdminController::class, 'updateBoard']);
+                    Route::post('/cover', [BoardAdminController::class, 'updateCover']);
                     Route::post('/posts', [BoardPostController::class , 'store']);
                     Route::post('/upload-image', [BoardPostController::class , 'uploadImage']);
                     Route::delete('/posts/{post}', [BoardPostController::class , 'destroy']);

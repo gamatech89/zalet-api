@@ -157,7 +157,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/', [BoardController::class, 'store'])->middleware('auth:sanctum');
             Route::get('/{board:slug}', [BoardController::class , 'show']);
             Route::get('/{board:slug}/posts', [BoardPostController::class , 'index']);
-            Route::get('/{board:slug}/posts/{post}', [BoardPostController::class , 'show']);
+            Route::get('/{board:slug}/posts/{post}', [BoardPostController::class , 'show'])->whereUuid('post');
             Route::get('/{board:slug}/categories', [BoardAdminController::class , 'listCategories']);
             Route::get('/{board:slug}/members', [BoardAdminController::class , 'listMembers']);
             Route::get('/{board:slug}/streams', [BoardController::class, 'streams']);
@@ -182,7 +182,7 @@ Route::prefix('v1')->group(function () {
      |--------------------------------------------------------------------------
      */
 
-        Route::middleware('auth:sanctum')->group(function () {
+        Route::middleware(['auth:sanctum', 'email.verified'])->group(function () {
 
             // Auth routes (protected)
             Route::prefix('auth')->group(function () {

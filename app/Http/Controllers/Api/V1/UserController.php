@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class UserController extends Controller
 {
@@ -28,6 +29,11 @@ class UserController extends Controller
 
         $currentUserId = $authUser?->id;
 
+        // Single query to check which of these users the current user already follows
+        if ($currentUserId) {
+            $users->load(['followers' => fn ($q) => $q->where('follower_id', $currentUserId)->select('users.id')]);
+        }
+
         return response()->json([
             'data' => $users->map(function ($user) use ($currentUserId) {
                 return [
@@ -37,9 +43,7 @@ class UserController extends Controller
                     'avatar_url' => $user->profile?->avatar_url,
                     'bio' => $user->profile?->bio,
                     'role' => $user->role,
-                    'is_following' => $currentUserId
-                        ? $user->followers()->where('follower_id', $currentUserId)->exists()
-                        : false,
+                    'is_following' => $currentUserId ? $user->followers->isNotEmpty() : false,
                     'type' => 'user',
                 ];
             }),
@@ -64,14 +68,24 @@ class UserController extends Controller
 
         $authUser = $request->user('sanctum');
 
-        // Stats
-        $followersCount = $user->followers()->count();
-        $followingCount = $user->following()->count();
-        $momentsCount = $user->media()->where('type', 'moment')->count(); // Assuming 'moment' type exists
+        // One query for all three counts
+        $user->loadCount([
+            'followers',
+            'following',
+            'media as moments_count' => fn ($q) => $q->where('type', 'moment'),
+        ]);
 
-        // Relationship status (if authenticated)
-        $isFollowing = $authUser ? $authUser->following()->where('following_id', $user->id)->exists() : false;
-        $isFollowedBy = $authUser ? $authUser->followers()->where('follower_id', $user->id)->exists() : false;
+        // One query for both follow directions
+        $isFollowing = false;
+        $isFollowedBy = false;
+        if ($authUser) {
+            $followRows = DB::table('follows')
+                ->where(fn ($q) => $q->where('follower_id', $authUser->id)->where('following_id', $user->id))
+                ->orWhere(fn ($q) => $q->where('follower_id', $user->id)->where('following_id', $authUser->id))
+                ->get(['follower_id', 'following_id']);
+            $isFollowing  = $followRows->contains(fn ($r) => $r->follower_id === $authUser->id && $r->following_id === $user->id);
+            $isFollowedBy = $followRows->contains(fn ($r) => $r->follower_id === $user->id   && $r->following_id === $authUser->id);
+        }
 
         return response()->json([
             'id' => $user->id,
@@ -87,11 +101,11 @@ class UserController extends Controller
             'website' => $user->profile->website ?? null,
             'joined_at' => $user->created_at->toIso8601String(),
             'stats' => [
-                'followers_count' => $followersCount,
-                'following_count' => $followingCount,
-                'moments_count' => $momentsCount,
-                'is_following' => $isFollowing,
-                'is_followed_by' => $isFollowedBy,
+                'followers_count' => $user->followers_count,
+                'following_count' => $user->following_count,
+                'moments_count'   => $user->moments_count,
+                'is_following'    => $isFollowing,
+                'is_followed_by'  => $isFollowedBy,
             ]
         ]);
     }

@@ -33,6 +33,7 @@ use App\Http\Controllers\Api\V1\CreatorRequestController;
 use App\Http\Controllers\Api\V1\WalletController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\BlockController;
+use App\Http\Controllers\Api\V1\BanController;
 use App\Http\Controllers\Api\V1\ReportController;
 use Illuminate\Support\Facades\Route;
 
@@ -455,6 +456,12 @@ Route::prefix('v1')->group(function () {
                 // Economy Settings
                 Route::get('/settings', [AdminSettingsController::class, 'index']);
                 Route::put('/settings/{key}', [AdminSettingsController::class, 'update']);
+
+                // Ban Management
+                Route::get('/bans', [BanController::class, 'index']);
+                Route::post('/bans', [BanController::class, 'store']);
+                Route::delete('/bans/{ban}', [BanController::class, 'destroy']);
+                Route::post('/users/{user}/ban', [BanController::class, 'banUser']);
             }
             );
 

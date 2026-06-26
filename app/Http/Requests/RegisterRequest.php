@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Models\BannedIdentifier;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class RegisterRequest extends FormRequest
 {
@@ -21,8 +23,18 @@ class RegisterRequest extends FormRequest
      */
     public function rules(): array
     {
+        $bannedEmails = BannedIdentifier::emails()->pluck('value')->all();
+        $bannedIps    = BannedIdentifier::ips()->pluck('value')->all();
+
         return [
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            'email' => [
+                'required',
+                'string',
+                'email',
+                'max:255',
+                'unique:users,email',
+                Rule::notIn($bannedEmails),
+            ],
             'username' => [
                 'required',
                 'string',
@@ -32,7 +44,19 @@ class RegisterRequest extends FormRequest
                 'unique:users,username',
             ],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
+            '_ip_check' => [
+                Rule::notIn($bannedIps),
+            ],
         ];
+    }
+
+    /**
+     * Prepare the data for validation.
+     * Inject the request IP so we can validate it using the rules array.
+     */
+    protected function prepareForValidation(): void
+    {
+        $this->merge(['_ip_check' => $this->ip()]);
     }
 
     /**
@@ -41,7 +65,9 @@ class RegisterRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'username.regex' => 'Username may only contain letters, numbers, and underscores.',
+            'username.regex'      => 'Username may only contain letters, numbers, and underscores.',
+            'email.not_in'        => 'This email address is not allowed to register.',
+            '_ip_check.not_in'    => 'Registration is not allowed from your current IP address.',
         ];
     }
 }

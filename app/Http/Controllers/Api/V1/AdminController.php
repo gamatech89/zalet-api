@@ -11,6 +11,7 @@ use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class AdminController extends Controller
 {
@@ -20,29 +21,57 @@ class AdminController extends Controller
      */
     public function stats(): JsonResponse
     {
+        // 4 queries instead of 12 — one per table using conditional aggregation
+        $userStats = User::selectRaw("
+            COUNT(*) as total,
+            SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END) as admins,
+            SUM(CASE WHEN role = 'creator' THEN 1 ELSE 0 END) as creators,
+            SUM(CASE WHEN role = 'user' THEN 1 ELSE 0 END) as regular,
+            SUM(CASE WHEN is_legacy_founder THEN 1 ELSE 0 END) as legacy_founders
+        ")->first();
+
+        $txStats = DB::table('transactions')->selectRaw("
+            COUNT(*) as total,
+            SUM(CASE WHEN status = 'completed' THEN amount ELSE 0 END) as total_volume,
+            SUM(CASE WHEN type = 'deposit' AND status = 'completed' THEN amount ELSE 0 END) as deposits,
+            SUM(CASE WHEN type = 'withdrawal' AND status = 'completed' THEN amount ELSE 0 END) as withdrawals
+        ")->first();
+
+        $mediaStats = Media::selectRaw("
+            COUNT(*) as total,
+            SUM(CASE WHEN type = 'moment' THEN 1 ELSE 0 END) as moments,
+            SUM(CASE WHEN type = 'embed' THEN 1 ELSE 0 END) as cinema,
+            SUM(CASE WHEN type = 'long_form' THEN 1 ELSE 0 END) as long_form
+        ")->first();
+
+        $streamStats = LiveStream::selectRaw("
+            COUNT(*) as total,
+            SUM(CASE WHEN is_live THEN 1 ELSE 0 END) as currently_live
+        ")->first();
+
         $stats = [
             'users' => [
-                'total' => User::count(),
-                'admins' => User::where('role', 'admin')->count(),
-                'creators' => User::where('role', 'creator')->count(),
-                'regular' => User::where('role', 'user')->count(),
-                'legacy_founders' => User::where('is_legacy_founder', true)->count(),
+                'total'           => (int) $userStats->total,
+                'admins'          => (int) $userStats->admins,
+                'creators'        => (int) $userStats->creators,
+                'regular'         => (int) $userStats->regular,
+                'legacy_founders' => (int) $userStats->legacy_founders,
             ],
             'transactions' => [
-                'total' => Transaction::count(),
-                'total_volume' => (float) Transaction::where('status', 'completed')->sum('amount'),
-                'deposits' => (float) Transaction::where('type', 'deposit')->where('status', 'completed')->sum('amount'),
-                'withdrawals' => (float) Transaction::where('type', 'withdrawal')->where('status', 'completed')->sum('amount'),
+                'total'        => (int) $txStats->total,
+                'total_volume' => (float) $txStats->total_volume,
+                'deposits'     => (float) $txStats->deposits,
+                'withdrawals'  => (float) $txStats->withdrawals,
             ],
             'content' => [
-                'media_total' => Media::count(),
-                'moments' => Media::where('type', 'moment')->count(),
-                'cinema' => Media::where('type', 'embed')->count(),
-                'long_form' => Media::where('type', 'long_form')->count(),
+                'media_total' => (int) $mediaStats->total,
+                'moments'     => (int) $mediaStats->moments,
+                'cinema'      => (int) $mediaStats->cinema,
+                'long_form'   => (int) $mediaStats->long_form,
             ],
             'streams' => [
-                'total' => LiveStream::count(),
-                'currently_live' => LiveStream::where('is_live', true)->count(),
+                'total'         => (int) $streamStats->total,
+                'currently_live'=> (int) $streamStats->currently_live,
             ],
         ];
 

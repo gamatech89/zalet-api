@@ -41,13 +41,15 @@ class CreatorController extends Controller
 
         $totalSubscribers = 0;
 
-        // Content counts
-        $contentCount = Media::where('user_id', $user->id)->count();
-        $momentsCount = Media::where('user_id', $user->id)->where('type', 'moment')->count();
-        $cinemaCount = Media::where('user_id', $user->id)->where('type', 'embed')->count();
+        // Content counts — one query instead of three
+        $mediaCounts = Media::where('user_id', $user->id)->selectRaw("
+            COUNT(*) as total,
+            SUM(CASE WHEN type = 'moment' THEN 1 ELSE 0 END) as moments,
+            SUM(CASE WHEN type = 'embed' THEN 1 ELSE 0 END) as cinema
+        ")->first();
 
         // Follower count
-        $followersCount = $user->followers()->count();
+        $user->loadCount('followers');
 
         // Stream stats
         $totalStreams = $user->liveStreams()->count();
@@ -65,11 +67,11 @@ class CreatorController extends Controller
                     'active' => $activeSubscribers,
                     'total' => $totalSubscribers,
                 ],
-                'followers' => $followersCount,
+                'followers' => $user->followers_count,
                 'content' => [
-                    'total' => $contentCount,
-                    'moments' => $momentsCount,
-                    'cinema' => $cinemaCount,
+                    'total'   => (int) $mediaCounts->total,
+                    'moments' => (int) $mediaCounts->moments,
+                    'cinema'  => (int) $mediaCounts->cinema,
                 ],
                 'streams' => [
                     'total' => $totalStreams,

@@ -103,7 +103,7 @@ class MediaCommentController extends Controller
 
         // Notify media owner (not self-comment)
         if ($media->user_id !== $commenter->id) {
-            $owner = $media->user()->first();
+            $owner = $media->user;
             if ($owner) {
                 app(NotificationService::class)->create(
                     $owner,

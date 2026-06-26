@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Block;
 use App\Models\Media;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -15,9 +16,6 @@ class SearchController extends Controller
      * Global search across Moments, Scena, and Users.
      *
      * GET /api/v1/search?q=belgrade&type=all
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function index(Request $request): JsonResponse
     {
@@ -44,22 +42,12 @@ class SearchController extends Controller
 
         // Search Moments (short-form)
         if (in_array($type, ['all', 'moments'])) {
-            $momentsQuery = Media::moments()->with('user:id,username')
-                ->when($blockedIds->isNotEmpty(), fn ($q) => $q->whereNotIn('user_id', $blockedIds));
-
-            if ($isPgsql) {
-                $momentsQuery->where(function ($q) use ($term) {
-                    $q->whereRaw('unaccent(LOWER(title)) LIKE unaccent(?)', [$term])
-                      ->orWhereRaw('unaccent(LOWER(description)) LIKE unaccent(?)', [$term]);
-                });
-            } else {
-                $momentsQuery->where(function ($q) use ($term) {
-                    $q->whereRaw('LOWER(title) LIKE ?', [$term])
-                      ->orWhereRaw('LOWER(description) LIKE ?', [$term]);
-                });
-            }
-
-            $moments = $momentsQuery->latest()->limit(10)->get();
+            $moments = $this->applyTitleDescSearch(
+                Media::moments()->with('user:id,username')
+                    ->when($blockedIds->isNotEmpty(), fn ($q) => $q->whereNotIn('user_id', $blockedIds)),
+                $term,
+                $isPgsql
+            )->latest()->limit(10)->get();
 
             $results['moments'] = [
                 'count' => $moments->count(),
@@ -79,22 +67,12 @@ class SearchController extends Controller
 
         // Search Scena (long-form)
         if (in_array($type, ['all', 'scena'])) {
-            $scenaQuery = Media::longForm()->with('user:id,username')
-                ->when($blockedIds->isNotEmpty(), fn ($q) => $q->whereNotIn('user_id', $blockedIds));
-
-            if ($isPgsql) {
-                $scenaQuery->where(function ($q) use ($term) {
-                    $q->whereRaw('unaccent(LOWER(title)) LIKE unaccent(?)', [$term])
-                      ->orWhereRaw('unaccent(LOWER(description)) LIKE unaccent(?)', [$term]);
-                });
-            } else {
-                $scenaQuery->where(function ($q) use ($term) {
-                    $q->whereRaw('LOWER(title) LIKE ?', [$term])
-                      ->orWhereRaw('LOWER(description) LIKE ?', [$term]);
-                });
-            }
-
-            $scena = $scenaQuery->latest()->limit(10)->get();
+            $scena = $this->applyTitleDescSearch(
+                Media::longForm()->with('user:id,username')
+                    ->when($blockedIds->isNotEmpty(), fn ($q) => $q->whereNotIn('user_id', $blockedIds)),
+                $term,
+                $isPgsql
+            )->latest()->limit(10)->get();
 
             $results['scena'] = [
                 'count' => $scena->count(),
@@ -114,26 +92,13 @@ class SearchController extends Controller
 
         // Search Users
         if (in_array($type, ['all', 'users'])) {
-            $usersQuery = User::query()->with('profile')
-                ->when($blockedIds->isNotEmpty(), fn ($q) => $q->whereNotIn('id', $blockedIds));
-
-            if ($isPgsql) {
-                $usersQuery->where(function ($q) use ($term) {
-                    $q->whereRaw('unaccent(LOWER(username)) LIKE unaccent(?)', [$term])
-                      ->orWhereHas('profile', function ($pq) use ($term) {
-                          $pq->whereRaw('unaccent(LOWER(bio)) LIKE unaccent(?)', [$term]);
-                      });
-                });
-            } else {
-                $usersQuery->where(function ($q) use ($term) {
-                    $q->whereRaw('LOWER(username) LIKE ?', [$term])
-                      ->orWhereHas('profile', function ($pq) use ($term) {
-                          $pq->whereRaw('LOWER(bio) LIKE ?', [$term]);
-                      });
-                });
-            }
-
-            $users = $usersQuery->limit(10)->get();
+            $users = User::query()->with('profile')
+                ->when($blockedIds->isNotEmpty(), fn ($q) => $q->whereNotIn('id', $blockedIds))
+                ->where(function ($q) use ($term, $isPgsql) {
+                    $q->whereRaw($this->likeRaw('username', $isPgsql), [$term])
+                      ->orWhereHas('profile', fn ($pq) => $pq->whereRaw($this->likeRaw('bio', $isPgsql), [$term]));
+                })
+                ->limit(10)->get();
 
             $results['users'] = [
                 'count' => $users->count(),
@@ -152,5 +117,20 @@ class SearchController extends Controller
             'query' => $request->input('q'),
             'results' => $results,
         ]);
+    }
+
+    private function likeRaw(string $column, bool $isPgsql): string
+    {
+        return $isPgsql
+            ? "unaccent(LOWER({$column})) LIKE unaccent(?)"
+            : "LOWER({$column}) LIKE ?";
+    }
+
+    private function applyTitleDescSearch(Builder $query, string $term, bool $isPgsql): Builder
+    {
+        return $query->where(fn ($q) => $q
+            ->whereRaw($this->likeRaw('title', $isPgsql), [$term])
+            ->orWhereRaw($this->likeRaw('description', $isPgsql), [$term])
+        );
     }
 }

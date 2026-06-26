@@ -10,6 +10,7 @@ use App\Models\LiveStream;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class BoardController extends Controller
 {
@@ -110,8 +111,8 @@ class BoardController extends Controller
 
         $imageUrl = null;
         if ($request->hasFile('banner')) {
-            $path = $request->file('banner')->store('board-banners', 'public');
-            $imageUrl = asset('storage/' . $path);
+            $path = $request->file('banner')->store('board-banners');
+            $imageUrl = Storage::url($path);
         }
 
         $board = Board::create([

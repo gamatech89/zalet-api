@@ -40,6 +40,7 @@ class User extends Authenticatable implements FilamentUser, HasName, MustVerifyE
         'username',
         'name',
         'password',
+        'role',
         'legacy_id',
         'is_legacy_founder',
         'storage_limit_mb',

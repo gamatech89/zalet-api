@@ -54,9 +54,9 @@ class TransferTest extends TestCase
         // Verify new_balance (could be int or float)
         $this->assertEquals(900, $response->json('data.new_balance'));
 
-        // Verify balances
+        // Verify balances — platform keeps 10% transfer fee (transfer_fee_percent = 10)
         $this->assertEquals(900.00, $this->coinService->getBalance($this->sender));
-        $this->assertEquals(100.00, $this->coinService->getBalance($this->recipient));
+        $this->assertEquals(90.00, $this->coinService->getBalance($this->recipient));
     }
 
     /**

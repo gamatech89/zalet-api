@@ -398,16 +398,21 @@ class RaiffeisenPaymentService
                 $this->saveCardFromWebhook($data, $transaction->toWallet?->user_id ?? '');
             }
 
+            $upcTokenRaw = $data['UPCToken'] ?? null;
+            $recurrentRaw = $data['Recurrent'] ?? null;
+
             Log::info('Deposit confirmed via webhook', [
-                'order_id'       => $orderId,
-                'transaction_id' => $transaction->id,
-                'approval_code'  => $approvalCode,
-                'has_upc_token'  => $hasUpcToken,
-                'has_recurrent'  => $hasRecurrent,
-                'has_proxy_pan'  => $hasProxyPan,
-                'card_saved'     => ($hasUpcToken || $hasRecurrent) && $hasProxyPan,
-                'upc_token_exp'  => $data['UPCTokenExp'] ?? null,
-                'webhook_keys'   => array_keys($data),
+                'order_id'          => $orderId,
+                'transaction_id'    => $transaction->id,
+                'approval_code'     => $approvalCode,
+                'has_upc_token'     => $hasUpcToken,
+                'has_recurrent'     => $hasRecurrent,
+                'has_proxy_pan'     => $hasProxyPan,
+                'card_saved'        => ($hasUpcToken || $hasRecurrent) && $hasProxyPan,
+                'upc_token_exp'     => $data['UPCTokenExp'] ?? null,
+                'upc_token_value'   => $upcTokenRaw ? (substr($upcTokenRaw, 0, 8) . '...[len=' . strlen($upcTokenRaw) . ']') : null,
+                'recurrent_value'   => $recurrentRaw ? (substr($recurrentRaw, 0, 8) . '...[len=' . strlen($recurrentRaw) . ']') : null,
+                'webhook_keys'      => array_keys($data),
             ]);
 
             return $this->buildWebhookResponse($data, 'approve', 'ok');

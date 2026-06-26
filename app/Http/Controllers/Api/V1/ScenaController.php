@@ -55,8 +55,14 @@ class ScenaController extends Controller
             $query->withTag($request->input('tag'));
         }
 
-        $scena = $query->latest()
-            ->paginate($request->input('per_page', 12));
+        $sort = $request->input('sort', 'newest');
+        if ($sort === 'most_viewed') {
+            $query->orderByDesc('views_count');
+        } else {
+            $query->latest();
+        }
+
+        $scena = $query->paginate($request->input('per_page', 12));
 
         return response()->json([
             'data' => $scena->items(),

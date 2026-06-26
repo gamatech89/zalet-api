@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Events\MessageSentEvent;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateConversationRequest;
+use App\Models\Block;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\User;
@@ -130,9 +131,21 @@ class ConversationController extends Controller
         $isGroup = $request->boolean('is_group', false);
 
         if (!$isGroup && $userIds->count() === 1) {
+            $targetUserId = $userIds->first();
+
+            $isBlocked = Block::where(function ($q) use ($user, $targetUserId) {
+                $q->where('blocker_id', $user->id)->where('blocked_id', $targetUserId);
+            })->orWhere(function ($q) use ($user, $targetUserId) {
+                $q->where('blocker_id', $targetUserId)->where('blocked_id', $user->id);
+            })->exists();
+
+            if ($isBlocked) {
+                return response()->json(['message' => 'Ne možeš slati poruke ovom korisniku.'], 422);
+            }
+
             $existingConversation = $user->conversations()
                 ->where('is_group', false)
-                ->whereHas('users', fn ($q) => $q->where('users.id', $userIds->first()))
+                ->whereHas('users', fn ($q) => $q->where('users.id', $targetUserId))
                 ->first();
 
             if ($existingConversation) {

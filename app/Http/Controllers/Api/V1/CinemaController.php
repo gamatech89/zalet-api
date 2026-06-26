@@ -156,7 +156,7 @@ class CinemaController extends Controller
         ]);
     }
 
-    private function checkPpvLimits(int $userId): void
+    private function checkPpvLimits(string $userId): void
     {
         $monthlyLimit = AppSetting::get('ppv_monthly_limit', 3);
         $thisMonthCount = Media::where('user_id', $userId)

@@ -71,6 +71,22 @@ class MessageController extends Controller
     {
         Gate::authorize('sendMessage', $conversation);
 
+        // In direct (1-on-1) conversations, block the message if either side has blocked the other
+        if (!$conversation->is_group) {
+            $otherUser = $conversation->users()->where('users.id', '!=', $request->user()->id)->first();
+            if ($otherUser) {
+                $isBlocked = Block::where(function ($q) use ($request, $otherUser) {
+                    $q->where('blocker_id', $request->user()->id)->where('blocked_id', $otherUser->id);
+                })->orWhere(function ($q) use ($request, $otherUser) {
+                    $q->where('blocker_id', $otherUser->id)->where('blocked_id', $request->user()->id);
+                })->exists();
+
+                if ($isBlocked) {
+                    return response()->json(['message' => 'Ne možeš slati poruke ovom korisniku.'], 422);
+                }
+            }
+        }
+
         $data = [
             'sender_id' => $request->user()->id,
             'content' => $request->content,

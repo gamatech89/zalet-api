@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\Block;
 use App\Models\Media;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -34,9 +35,17 @@ class SearchController extends Controller
 
         $results = [];
 
+        $authUser = $request->user('sanctum');
+        $blockedIds = $authUser
+            ? Block::where('blocker_id', $authUser->id)->pluck('blocked_id')
+                ->merge(Block::where('blocked_id', $authUser->id)->pluck('blocker_id'))
+                ->unique()
+            : collect();
+
         // Search Moments (short-form)
         if (in_array($type, ['all', 'moments'])) {
-            $momentsQuery = Media::moments()->with('user:id,username');
+            $momentsQuery = Media::moments()->with('user:id,username')
+                ->when($blockedIds->isNotEmpty(), fn ($q) => $q->whereNotIn('user_id', $blockedIds));
 
             if ($isPgsql) {
                 $momentsQuery->where(function ($q) use ($term) {
@@ -70,7 +79,8 @@ class SearchController extends Controller
 
         // Search Scena (long-form)
         if (in_array($type, ['all', 'scena'])) {
-            $scenaQuery = Media::longForm()->with('user:id,username');
+            $scenaQuery = Media::longForm()->with('user:id,username')
+                ->when($blockedIds->isNotEmpty(), fn ($q) => $q->whereNotIn('user_id', $blockedIds));
 
             if ($isPgsql) {
                 $scenaQuery->where(function ($q) use ($term) {
@@ -104,7 +114,8 @@ class SearchController extends Controller
 
         // Search Users
         if (in_array($type, ['all', 'users'])) {
-            $usersQuery = User::query()->with('profile');
+            $usersQuery = User::query()->with('profile')
+                ->when($blockedIds->isNotEmpty(), fn ($q) => $q->whereNotIn('id', $blockedIds));
 
             if ($isPgsql) {
                 $usersQuery->where(function ($q) use ($term) {

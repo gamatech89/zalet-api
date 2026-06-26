@@ -27,7 +27,7 @@ class GiftController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $cacheKey = 'gifts.catalog' . ($request->filled('category') ? '.' . $request->category : '');
+        $cacheKey = 'gifts.catalog.v2' . ($request->filled('category') ? '.' . $request->category : '');
 
         $data = Cache::remember($cacheKey, 3600, function () use ($request) {
             $query = Gift::active()->with('category')->ordered();
@@ -41,6 +41,7 @@ class GiftController extends Controller
                     'id', 'name', 'coin_price', 'icon_url',
                     'icon_2d', 'icon_3d', 'category_id',
                     'description', 'sort_order', 'level',
+                    'is_epic', 'is_rare',
                 ]),
                 'categories' => GiftCategory::active()
                     ->ordered()
@@ -93,6 +94,7 @@ class GiftController extends Controller
                 'coin_price' => (float) $gift->coin_price,
                 'icon_url' => $gift->icon_url,
                 'icon_3d' => $gift->icon_3d,
+                'description' => $gift->description,
             ]);
 
             $message = $conversation->messages()->create([

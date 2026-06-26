@@ -387,20 +387,23 @@ class RaiffeisenPaymentService
             // Coin deposit flow
             $this->coinService->confirmDeposit($transaction);
 
-            // UPCToken = card token (needed for payByToken); Recurrent = Visa/MC tx reference (different thing)
+            // UPCToken = card token for payByToken (what we need for saved cards).
+            // Recurrent = Visa/MC transaction reference ID — NOT usable for payByToken.
+            // Only save a card if the bank actually returned UPCToken.
             $hasUpcToken = !empty($data['UPCToken']);
             $hasRecurrent = !empty($data['Recurrent']);
-            if (($hasUpcToken || $hasRecurrent) && !empty($data['ProxyPan'])) {
+            if ($hasUpcToken && !empty($data['ProxyPan'])) {
                 $this->saveCardFromWebhook($data, $transaction->toWallet?->user_id ?? '');
             }
 
             Log::info('Deposit confirmed via webhook', [
-                'order_id' => $orderId,
+                'order_id'      => $orderId,
                 'transaction_id' => $transaction->id,
                 'approval_code' => $approvalCode,
-                'has_upc_token' => $hasUpcToken,
-                'has_recurrent' => $hasRecurrent,
+                'tokenization'  => $hasUpcToken ? 'UPCToken present — card saved' : ($hasRecurrent ? 'only Recurrent (no UPCToken) — card NOT saved' : 'no token'),
                 'upc_token_exp' => $data['UPCTokenExp'] ?? null,
+                'proxy_pan'     => $data['ProxyPan'] ?? null,
+                'webhook_keys'  => array_keys($data), // log all fields bank sent for debugging
             ]);
 
             return $this->buildWebhookResponse($data, 'approve', 'ok');
@@ -430,8 +433,8 @@ class RaiffeisenPaymentService
     public function saveCardFromWebhook(array $data, string $userId): ?PaymentMethod
     {
         // UPCToken is the actual card token for future payments.
-        // Recurrent is a Visa/MC transaction reference ID — different thing, not usable for payByToken.
-        $token = $data['UPCToken'] ?? $data['Recurrent'] ?? null;
+        // Recurrent is a Visa/MC transaction reference ID — NOT usable for payByToken.
+        $token = $data['UPCToken'] ?? null;
         $proxyPan = $data['ProxyPan'] ?? null;
 
         if (!$token || !$userId) {

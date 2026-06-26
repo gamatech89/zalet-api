@@ -45,6 +45,18 @@ class GiftResource extends Resource
                             ->numeric()
                             ->default(0)
                             ->helperText('Lower numbers appear first.'),
+                        Forms\Components\Select::make('level')
+                            ->label('Level (Stars)')
+                            ->options([
+                                1 => '★ — Common',
+                                2 => '★★ — Uncommon',
+                                3 => '★★★ — Notable',
+                                4 => '★★★★ — Rare',
+                                5 => '★★★★★ — Legendary',
+                            ])
+                            ->default(1)
+                            ->required()
+                            ->helperText('Controls the star rating shown on gift cards.'),
                         Forms\Components\Textarea::make('description')
                             ->maxLength(255)
                             ->columnSpanFull(),
@@ -124,6 +136,10 @@ class GiftResource extends Resource
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Active')
                     ->boolean(),
+                Tables\Columns\TextColumn::make('level')
+                    ->label('★')
+                    ->formatStateUsing(fn ($state) => str_repeat('★', (int) $state))
+                    ->sortable(),
                 Tables\Columns\IconColumn::make('is_epic')
                     ->label('Epic')
                     ->boolean(),

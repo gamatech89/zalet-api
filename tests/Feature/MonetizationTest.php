@@ -51,9 +51,9 @@ class MonetizationTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonPath('data.amount_paid', '50.00');
 
-        // Check balances
+        // Check balances — platform keeps 40% of PPV (ppv_creator_percent = 60)
         $this->assertEquals(50.00, $this->coinService->getBalance($this->buyer));
-        $this->assertEquals(50.00, $this->coinService->getBalance($this->creator));
+        $this->assertEquals(30.00, $this->coinService->getBalance($this->creator));
 
         // Check purchase record
         $this->assertDatabaseHas('media_purchases', [

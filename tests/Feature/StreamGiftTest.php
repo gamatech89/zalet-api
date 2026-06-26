@@ -43,9 +43,9 @@ class StreamGiftTest extends TestCase
                 'data' => ['gift', 'transaction_id', 'session_total'],
             ]);
 
-        // Verify balances updated
+        // Verify balances updated — platform keeps 50% of stream gifts (gift_creator_percent = 50)
         $this->assertEquals(90, $sender->wallet->fresh()->balance);
-        $this->assertEquals(10, $streamer->wallet->fresh()->balance);
+        $this->assertEquals(5, $streamer->wallet->fresh()->balance);
 
         // Verify session total updated
         $this->assertEquals(10, $session->fresh()->total_coins_collected);

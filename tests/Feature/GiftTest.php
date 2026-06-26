@@ -97,9 +97,9 @@ class GiftTest extends TestCase
             ->assertJsonPath('data.gift.name', 'Heart')
             ->assertJsonPath('data.amount', 10);
 
-        // Verify balances
+        // Verify balances — platform keeps 50% of gifts (gift_creator_percent = 50)
         $this->assertEquals(90.00, $this->coinService->getBalance($this->sender));
-        $this->assertEquals(10.00, $this->coinService->getBalance($this->recipient));
+        $this->assertEquals(5.00, $this->coinService->getBalance($this->recipient));
     }
 
     /**

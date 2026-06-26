@@ -27,7 +27,7 @@ class GiftController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $cacheKey = 'gifts.catalog.v3' . ($request->filled('category') ? '.' . $request->category : '');
+        $cacheKey = 'gifts.catalog.v4' . ($request->filled('category') ? '.' . $request->category : '');
 
         $data = Cache::remember($cacheKey, 3600, function () use ($request) {
             $query = Gift::active()->with('category')->ordered();

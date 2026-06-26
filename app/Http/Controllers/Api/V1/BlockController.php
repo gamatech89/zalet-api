@@ -7,6 +7,7 @@ use App\Models\Block;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class BlockController extends Controller
 {
@@ -46,10 +47,24 @@ class BlockController extends Controller
             return response()->json(['message' => 'Ne možeš blokirati sam sebe.'], 422);
         }
 
-        Block::firstOrCreate([
-            'blocker_id' => $request->user()->id,
-            'blocked_id' => $validated['user_id'],
-        ]);
+        DB::transaction(function () use ($request, $validated) {
+            Block::firstOrCreate([
+                'blocker_id' => $request->user()->id,
+                'blocked_id' => $validated['user_id'],
+            ]);
+
+            // Remove follows in both directions
+            DB::table('follows')
+                ->where(function ($q) use ($request, $validated) {
+                    $q->where('follower_id', $request->user()->id)
+                      ->where('following_id', $validated['user_id']);
+                })
+                ->orWhere(function ($q) use ($request, $validated) {
+                    $q->where('follower_id', $validated['user_id'])
+                      ->where('following_id', $request->user()->id);
+                })
+                ->delete();
+        });
 
         return response()->json(['message' => 'Korisnik je blokiran.'], 201);
     }

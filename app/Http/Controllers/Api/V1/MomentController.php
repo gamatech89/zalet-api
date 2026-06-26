@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreMomentRequest;
+use App\Models\Block;
 use App\Models\Media;
 use App\Services\ContentAccessService;
 use App\Services\MediaService;
@@ -37,8 +38,17 @@ class MomentController extends Controller
                 $query->where('is_approved', true);
             }
         } else {
-            // Public feed: only approved moments
+            // Public feed: only approved moments, excluding blocked users
             $query->where('is_approved', true);
+
+            if ($authUser) {
+                $blockedIds = Block::where('blocker_id', $authUser->id)->pluck('blocked_id')
+                    ->merge(Block::where('blocked_id', $authUser->id)->pluck('blocker_id'))
+                    ->unique();
+                if ($blockedIds->isNotEmpty()) {
+                    $query->whereNotIn('user_id', $blockedIds);
+                }
+            }
         }
 
         $moments = $query->latest()

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\Block;
 use App\Models\Media;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -15,9 +16,6 @@ class SearchController extends Controller
      * Global search across Moments, Scena, and Users.
      *
      * GET /api/v1/search?q=belgrade&type=all
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function index(Request $request): JsonResponse
     {
@@ -35,9 +33,21 @@ class SearchController extends Controller
 
         $results = [];
 
+        $authUser = $request->user('sanctum');
+        $blockedIds = $authUser
+            ? Block::where('blocker_id', $authUser->id)->pluck('blocked_id')
+                ->merge(Block::where('blocked_id', $authUser->id)->pluck('blocker_id'))
+                ->unique()
+            : collect();
+
+        // Search Moments (short-form)
         if (in_array($type, ['all', 'moments'])) {
-            $moments = $this->applyTitleDescSearch(Media::moments()->with('user:id,username'), $term, $isPgsql)
-                ->latest()->limit(10)->get();
+            $moments = $this->applyTitleDescSearch(
+                Media::moments()->with('user:id,username')
+                    ->when($blockedIds->isNotEmpty(), fn ($q) => $q->whereNotIn('user_id', $blockedIds)),
+                $term,
+                $isPgsql
+            )->latest()->limit(10)->get();
 
             $results['moments'] = [
                 'count' => $moments->count(),
@@ -55,9 +65,14 @@ class SearchController extends Controller
             ];
         }
 
+        // Search Scena (long-form)
         if (in_array($type, ['all', 'scena'])) {
-            $scena = $this->applyTitleDescSearch(Media::longForm()->with('user:id,username'), $term, $isPgsql)
-                ->latest()->limit(10)->get();
+            $scena = $this->applyTitleDescSearch(
+                Media::longForm()->with('user:id,username')
+                    ->when($blockedIds->isNotEmpty(), fn ($q) => $q->whereNotIn('user_id', $blockedIds)),
+                $term,
+                $isPgsql
+            )->latest()->limit(10)->get();
 
             $results['scena'] = [
                 'count' => $scena->count(),
@@ -75,8 +90,10 @@ class SearchController extends Controller
             ];
         }
 
+        // Search Users
         if (in_array($type, ['all', 'users'])) {
             $users = User::query()->with('profile')
+                ->when($blockedIds->isNotEmpty(), fn ($q) => $q->whereNotIn('id', $blockedIds))
                 ->where(function ($q) use ($term, $isPgsql) {
                     $q->whereRaw($this->likeRaw('username', $isPgsql), [$term])
                       ->orWhereHas('profile', fn ($pq) => $pq->whereRaw($this->likeRaw('bio', $isPgsql), [$term]));

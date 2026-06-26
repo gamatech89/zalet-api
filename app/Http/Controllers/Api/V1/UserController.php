@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\Block;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,9 +19,16 @@ class UserController extends Controller
     {
         $authUser = $request->user();
 
+        $blockedIds = $authUser
+            ? Block::where('blocker_id', $authUser->id)->pluck('blocked_id')
+                ->merge(Block::where('blocked_id', $authUser->id)->pluck('blocker_id'))
+                ->unique()
+            : collect();
+
         $users = User::query()
             ->with('profile')
             ->when($authUser, fn ($q) => $q->where('id', '!=', $authUser->id))
+            ->when($blockedIds->isNotEmpty(), fn ($q) => $q->whereNotIn('id', $blockedIds))
             // Creators first, then by follower count desc, then recent
             ->orderByRaw("CASE WHEN role = 'creator' THEN 0 WHEN role = 'admin' THEN 1 ELSE 2 END")
             ->orderByDesc('created_at')
@@ -60,13 +68,25 @@ class UserController extends Controller
         $query = User::query();
         if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $key)) {
             $query->where('id', $key);
-        }
-        else {
+        } else {
             $query->where('username', $key);
         }
         $user = $query->with(['profile'])->firstOrFail();
 
         $authUser = $request->user('sanctum');
+
+        // Block check — return 404 to not reveal the user exists
+        if ($authUser && $authUser->id !== $user->id) {
+            $isBlocked = Block::where(function ($q) use ($authUser, $user) {
+                $q->where('blocker_id', $authUser->id)->where('blocked_id', $user->id);
+            })->orWhere(function ($q) use ($authUser, $user) {
+                $q->where('blocker_id', $user->id)->where('blocked_id', $authUser->id);
+            })->exists();
+
+            if ($isBlocked) {
+                return response()->json(['message' => 'Not found.'], 404);
+            }
+        }
 
         // One query for all three counts
         $user->loadCount([
@@ -94,10 +114,9 @@ class UserController extends Controller
             'role' => $user->role,
             'avatar_url' => $user->profile->avatar_url,
             'bio' => $user->profile->bio,
-            // Use profile fields if available, otherwise null
             'location' => $user->profile->current_city && $user->profile->current_country
-            ? "{$user->profile->current_city}, {$user->profile->current_country}"
-            : null,
+                ? "{$user->profile->current_city}, {$user->profile->current_country}"
+                : null,
             'website' => $user->profile->website ?? null,
             'joined_at' => $user->created_at->toIso8601String(),
             'stats' => [

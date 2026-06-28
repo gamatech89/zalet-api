@@ -108,7 +108,7 @@ class MediaInteractionController extends Controller
                     'id', 'user_id', 'type', 'title', 'description',
                     'url', 'thumbnail_url',
                     'is_ppv', 'price_coins', 'access_level',
-                    'views_count', 'likes_count', 'bookmarks_count', 'comments_count',
+                    'views_count', 'likes_count', 'comments_count',
                     'created_at'
                 );
             }])

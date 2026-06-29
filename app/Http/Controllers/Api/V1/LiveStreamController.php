@@ -9,6 +9,7 @@ use App\Models\LiveStream;
 use App\Services\LiveKitService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class LiveStreamController extends Controller
@@ -210,6 +211,11 @@ class LiveStreamController extends Controller
         $request->validate([
             'thumbnail' => ['required', 'image', 'mimes:jpeg,png,webp', 'max:5120'], // max 5MB
         ]);
+
+        // Delete the previous thumbnail file to prevent accumulation
+        if ($liveStream->thumbnail_url) {
+            Storage::disk('public')->delete($liveStream->thumbnail_url);
+        }
 
         $path = $request->file('thumbnail')->store('live-thumbnails', 'public');
 

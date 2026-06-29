@@ -3,18 +3,19 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Events\GiftSentEvent;
-use App\Events\StreamGoalUpdatedEvent;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SendStreamGiftRequest;
 use App\Models\Gift;
 use App\Models\LiveStream;
 use App\Services\CoinService;
+use App\Services\LiveStreamService;
 use Illuminate\Http\JsonResponse;
 
 class StreamGiftController extends Controller
 {
     public function __construct(
-        private CoinService $coinService
+        private CoinService $coinService,
+        private LiveStreamService $liveStreamService,
     ) {}
 
     /**
@@ -60,24 +61,8 @@ class StreamGiftController extends Controller
             // Broadcast the gift event to the stream channel
             broadcast(new GiftSentEvent($sender, $streamer, $gift, $session));
 
-            // Update stream goals if any are set
-            $goals = $liveStream->goals ?? [];
-            if (!empty($goals)) {
-                $coinAmount = (int) $gift->coin_price;
-                foreach ($goals as $idx => $goal) {
-                    if ($goal['current_coins'] < $goal['target_coins']) {
-                        $wasDone = $goal['current_coins'] >= $goal['target_coins'];
-                        $goals[$idx]['current_coins'] = min(
-                            $goals[$idx]['current_coins'] + $coinAmount,
-                            $goals[$idx]['target_coins']
-                        );
-                        $isNowDone = $goals[$idx]['current_coins'] >= $goals[$idx]['target_coins'];
-                        $liveStream->update(['goals' => $goals]);
-                        broadcast(new StreamGoalUpdatedEvent($liveStream->fresh(), $idx, !$wasDone && $isNowDone));
-                        break; // Fill one goal at a time
-                    }
-                }
-            }
+            // Update stream goals via service
+            $this->liveStreamService->updateGoalProgress($liveStream, (int) $gift->coin_price);
 
             return response()->json([
                 'message' => 'Gift sent successfully!',

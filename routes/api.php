@@ -319,7 +319,6 @@ Route::prefix('v1')->group(function () {
                         Route::delete('/schedule/{liveStream}', [StreamScheduleController::class , 'destroy']);
                         // Stream goals
                         Route::put('/{liveStream}/goals', [StreamGoalController::class , 'update']);
-                        Route::post('/{liveStream}/goals/{index}/progress', [StreamGoalController::class , 'progress']);
                     });
                 });
 

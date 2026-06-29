@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateStreamRequest;
 use App\Models\LiveStream;
 use App\Services\LiveKitService;
+use App\Services\LiveStreamService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -15,7 +16,8 @@ use Illuminate\Support\Str;
 class LiveStreamController extends Controller
 {
     public function __construct(
-        private LiveKitService $liveKit
+        private LiveKitService $liveKit,
+        private LiveStreamService $liveStreamService,
     ) {}
 
     /**
@@ -120,39 +122,11 @@ class LiveStreamController extends Controller
      */
     public function start(Request $request): JsonResponse
     {
-        $user = $request->user();
-
-        if (!$user->isCreator()) {
-            return response()->json([
-                'message' => 'Only creators can start streams.',
-            ], 403);
-        }
-
-        $stream = $user->liveStreams()->latest()->first();
-
-        if (!$stream) {
-            return response()->json([
-                'message' => 'No stream found. Create a stream first.',
-            ], 404);
-        }
-
-        if ($stream->is_live) {
-            return response()->json([
-                'message' => 'Stream is already live.',
-                'session_id' => $stream->currentSession?->id,
-            ], 409);
-        }
-
-        $session = $stream->goLive();
+        $data = $this->liveStreamService->startStream($request->user());
 
         return response()->json([
             'message' => 'Stream started successfully.',
-            'data' => [
-                'stream_id' => $stream->id,
-                'session_id' => $session->id,
-                'stream_mode' => $stream->stream_mode,
-                'started_at' => $session->start_time->toIso8601String(),
-            ],
+            'data'    => $data,
         ]);
     }
 
@@ -162,38 +136,11 @@ class LiveStreamController extends Controller
      */
     public function stop(Request $request): JsonResponse
     {
-        $user = $request->user();
-
-        if (!$user->isCreator()) {
-            return response()->json([
-                'message' => 'Only creators can stop streams.',
-            ], 403);
-        }
-
-        $stream = $user->liveStreams()->where('is_live', true)->first();
-
-        if (!$stream) {
-            return response()->json([
-                'message' => 'No active stream found.',
-            ], 404);
-        }
-
-        $session = $stream->currentSession;
-        $stream->endStream();
-
-        // Clean up LiveKit room and clear the room name so it can't be reused
-        $this->liveKit->deleteRoom($stream);
-        $stream->update(['livekit_room_name' => null]);
+        $data = $this->liveStreamService->stopStream($request->user());
 
         return response()->json([
             'message' => 'Stream stopped successfully.',
-            'data' => [
-                'stream_id' => $stream->id,
-                'session_id' => $session?->id,
-                'duration_minutes' => $session?->getDurationMinutes(),
-                'total_coins_collected' => (float) $session?->total_coins_collected,
-                'peak_viewers' => $session?->peak_viewers,
-            ],
+            'data'    => $data,
         ]);
     }
 
@@ -203,11 +150,7 @@ class LiveStreamController extends Controller
      */
     public function uploadThumbnail(Request $request, LiveStream $liveStream): JsonResponse
     {
-        $user = $request->user();
-
-        if ($user->id !== $liveStream->user_id) {
-            return response()->json(['message' => 'Not authorized to modify this stream.'], 403);
-        }
+        $this->authorize('update', $liveStream);
 
         $request->validate([
             'thumbnail' => ['required', 'image', 'mimes:jpeg,png,webp', 'max:5120'], // max 5MB
@@ -416,12 +359,7 @@ class LiveStreamController extends Controller
      */
     public function uploadRecording(Request $request, LiveStream $liveStream): JsonResponse
     {
-        $user = $request->user();
-
-        // Only the stream owner can upload recordings
-        if ($liveStream->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized.'], 403);
-        }
+        $this->authorize('update', $liveStream);
 
         $request->validate([
             'recording' => 'required|file|mimetypes:video/webm,video/mp4,video/x-matroska|max:2097152', // 2 GB max
@@ -456,11 +394,7 @@ class LiveStreamController extends Controller
      */
     public function discardRecording(Request $request, LiveStream $liveStream): JsonResponse
     {
-        $user = $request->user();
-
-        if ($liveStream->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized.'], 403);
-        }
+        $this->authorize('update', $liveStream);
 
         $liveStream->deleteRecording();
 

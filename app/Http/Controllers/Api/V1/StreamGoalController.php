@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Events\StreamGoalUpdatedEvent;
 use App\Http\Controllers\Controller;
 use App\Models\LiveStream;
 use Illuminate\Http\JsonResponse;
@@ -35,34 +34,4 @@ class StreamGoalController extends Controller
         return response()->json(['data' => $liveStream->goals]);
     }
 
-    /**
-     * Increment a goal's current_coins (called internally when a gift is sent).
-     * POST /api/v1/streams/{liveStream}/goals/{index}/progress
-     */
-    public function progress(Request $request, LiveStream $liveStream, int $index): JsonResponse
-    {
-        abort_if($liveStream->user_id !== $request->user()->id, 403);
-
-        $goals = $liveStream->goals ?? [];
-        if (!isset($goals[$index])) {
-            return response()->json(['message' => 'Goal not found.'], 404);
-        }
-
-        $request->validate(['coins' => 'required|integer|min:1']);
-
-        $wasDone = $goals[$index]['current_coins'] >= $goals[$index]['target_coins'];
-        $goals[$index]['current_coins'] = min(
-            $goals[$index]['current_coins'] + $request->coins,
-            $goals[$index]['target_coins']
-        );
-        $isNowDone = $goals[$index]['current_coins'] >= $goals[$index]['target_coins'];
-
-        $liveStream->update(['goals' => $goals]);
-
-        // Broadcast update; mark as completed if just crossed threshold
-        $completed = !$wasDone && $isNowDone;
-        broadcast(new StreamGoalUpdatedEvent($liveStream->fresh(), $index, $completed));
-
-        return response()->json(['data' => $goals]);
-    }
 }

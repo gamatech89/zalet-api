@@ -294,7 +294,8 @@ class LiveStreamController extends Controller
      */
     public function viewerToken(Request $request, LiveStream $liveStream): JsonResponse
     {
-        $user = $request->user();
+        // Route is public so auth middleware hasn't run — resolve via Sanctum explicitly
+        $user = $request->user() ?? auth('sanctum')->user();
 
         if (!$liveStream->is_live) {
             return response()->json([

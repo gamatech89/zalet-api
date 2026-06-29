@@ -66,7 +66,7 @@ class StreamGiftController extends Controller
                 $coinAmount = (int) $gift->coin_price;
                 foreach ($goals as $idx => $goal) {
                     if ($goal['current_coins'] < $goal['target_coins']) {
-                        $wasDone = false;
+                        $wasDone = $goal['current_coins'] >= $goal['target_coins'];
                         $goals[$idx]['current_coins'] = min(
                             $goals[$idx]['current_coins'] + $coinAmount,
                             $goals[$idx]['target_coins']

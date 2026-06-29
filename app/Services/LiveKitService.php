@@ -46,7 +46,7 @@ class LiveKitService
                 $roomService = new RoomServiceClient($this->host, $this->apiKey, $this->apiSecret);
                 $options = (new \Agence104\LiveKit\RoomCreateOptions())
                     ->setName($roomName)
-                    ->setEmptyTimeout(300)
+                    ->setEmptyTimeout(3600) // 1 hour — allows streamer reconnect after drop
                     ->setMaxParticipants(1000);
                 $roomService->createRoom($options);
             } catch (\Exception $e) {

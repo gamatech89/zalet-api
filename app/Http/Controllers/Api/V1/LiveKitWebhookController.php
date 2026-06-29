@@ -137,7 +137,7 @@ class LiveKitWebhookController extends Controller
     {
         // If stream is still marked live, force-end it
         if ($stream->is_live) {
-            $stream->update(['is_live' => false]);
+            $stream->update(['is_live' => false, 'livekit_room_name' => null]);
             $session = $stream->currentSession;
             if ($session && !$session->end_time) {
                 $session->update([
@@ -146,6 +146,9 @@ class LiveKitWebhookController extends Controller
                 ]);
             }
             Log::info("[LiveKit Webhook] room_finished — stream {$stream->id} force-ended.");
+        } else {
+            // Room finished cleanly — still clear the room name
+            $stream->update(['livekit_room_name' => null]);
         }
     }
 }

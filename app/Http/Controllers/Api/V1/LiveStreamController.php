@@ -181,8 +181,9 @@ class LiveStreamController extends Controller
         $session = $stream->currentSession;
         $stream->endStream();
 
-        // Clean up LiveKit room
+        // Clean up LiveKit room and clear the room name so it can't be reused
         $this->liveKit->deleteRoom($stream);
+        $stream->update(['livekit_room_name' => null]);
 
         return response()->json([
             'message' => 'Stream stopped successfully.',
@@ -266,7 +267,7 @@ class LiveStreamController extends Controller
 
         $streams = LiveStream::live()
             ->byMode($mode)
-            ->with(['user:id,username', 'currentSession'])
+            ->with(['user:id,username', 'user.profile:user_id,avatar_url', 'currentSession'])
             ->orderBy('updated_at', 'desc')
             ->paginate(20);
 
@@ -280,6 +281,7 @@ class LiveStreamController extends Controller
                     'streamer' => [
                         'id' => $stream->user->id,
                         'username' => $stream->user->username,
+                        'avatar_url' => $stream->user->profile?->avatar_url ?? null,
                     ],
                     'viewers' => $stream->currentSession?->current_viewers ?? 0,
                     'started_at' => $stream->currentSession?->start_time?->toIso8601String(),
@@ -365,7 +367,7 @@ class LiveStreamController extends Controller
         return response()->json([
             'message' => 'Message sent.',
             'data' => [
-                'id' => uniqid('msg-'),
+                'id' => (string) Str::uuid(),
                 'user' => [
                     'id' => $user->id,
                     'username' => $user->username,

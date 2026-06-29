@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
 
 class StreamSession extends Model
 {
@@ -42,10 +43,10 @@ class StreamSession extends Model
     public function viewerJoined(): void
     {
         $this->increment('current_viewers');
-        $this->refresh();
-        if ($this->current_viewers > $this->peak_viewers) {
-            $this->update(['peak_viewers' => $this->current_viewers]);
-        }
+        // Update peak atomically — avoids race between increment and read
+        DB::table('stream_sessions')
+            ->where('id', $this->id)
+            ->update(['peak_viewers' => DB::raw('GREATEST(peak_viewers, current_viewers)')]);
     }
 
     /**

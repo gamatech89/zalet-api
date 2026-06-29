@@ -302,7 +302,21 @@ class RaiffeisenPaymentService
         try {
             $key = \phpseclib3\Crypt\PublicKeyLoader::load(file_get_contents($certPath));
             $key = $key->withHash('sha512')->withPadding(\phpseclib3\Crypt\RSA::SIGNATURE_PKCS1);
-            return $key->verify($dataString, $signatureRaw);
+            $result = $key->verify($dataString, $signatureRaw);
+
+            if (!$result) {
+                Log::warning('Raiffeisen signature mismatch — dataString used', [
+                    'order_id'    => $data['OrderID'] ?? 'unknown',
+                    'data_string' => $dataString,
+                    'has_upc_token'   => isset($data['UPCToken']),
+                    'has_recurrent'   => isset($data['Recurrent']),
+                    'has_alt_amount'  => isset($data['AltTotalAmount']),
+                    'has_delay'       => isset($data['Delay']),
+                    'incoming_keys'   => array_keys($data),
+                ]);
+            }
+
+            return $result;
         } catch (\Exception $e) {
             Log::error('Raiffeisen signature verification error', [
                 'error' => $e->getMessage(),

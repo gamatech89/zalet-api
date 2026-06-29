@@ -33,9 +33,16 @@ class PaymentWebhookController extends Controller
 
         // Verify the webhook signature
         if (!$this->paymentService->verifyWebhookSignature($data)) {
+            // Log all incoming fields (except Signature value) so we can debug
+            // what changed on UPC side (e.g. new fields added to signature string)
+            $debugData = $data;
+            if (isset($debugData['Signature'])) {
+                $debugData['Signature'] = '[redacted, len=' . strlen($debugData['Signature']) . ']';
+            }
             Log::warning('Raiffeisen webhook signature verification failed', [
                 'order_id' => $data['OrderID'] ?? 'unknown',
                 'ip' => $request->ip(),
+                'all_fields' => $debugData,
             ]);
 
             // Return response in UPC format even on failure

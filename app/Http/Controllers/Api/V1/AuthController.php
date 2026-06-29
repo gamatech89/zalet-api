@@ -172,6 +172,33 @@ class AuthController extends Controller
     }
 
     /**
+     * Reset the user's password using a valid token.
+     *
+     * POST /api/v1/auth/reset-password
+     */
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'token'    => 'required|string',
+            'email'    => 'required|email',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $status = Password::reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function ($user, $password) {
+                $user->forceFill(['password' => bcrypt($password)])->save();
+            }
+        );
+
+        if ($status === Password::PASSWORD_RESET) {
+            return response()->json(['message' => 'Password has been reset.']);
+        }
+
+        return response()->json(['message' => __($status)], 422);
+    }
+
+    /**
      * Logout the current user.
      *
      * POST /api/v1/auth/logout

@@ -195,4 +195,10 @@ class User extends Authenticatable implements FilamentUser, HasName, MustVerifyE
     {
         return $this->following()->where('following_id', $userId)->exists();
     }
+
+    public function sendPasswordResetNotification($token): void
+    {
+        $url = config('app.frontend_url') . '/reset-password?token=' . $token . '&email=' . urlencode($this->email);
+        $this->notify(new \App\Notifications\ResetPasswordNotification($url));
+    }
 }

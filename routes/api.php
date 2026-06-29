@@ -71,6 +71,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/register', [AuthController::class , 'register']);
             Route::post('/login', [AuthController::class , 'login']);
             Route::post('/forgot-password', [AuthController::class , 'forgotPassword']);
+            Route::post('/reset-password', [AuthController::class , 'resetPassword']);
             // Email verification (signed URL — no auth required, link comes from email)
             Route::get('/verify-email/{id}/{hash}', [AuthController::class , 'verifyEmail'])
                 ->middleware('signed')

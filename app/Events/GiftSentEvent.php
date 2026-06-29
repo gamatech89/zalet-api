@@ -47,6 +47,8 @@ class GiftSentEvent implements ShouldBroadcast
                 'name' => $this->gift->name,
                 'coin_price' => (float) $this->gift->coin_price,
                 'icon_url' => $this->gift->icon_url,
+                'icon_2d' => $this->gift->icon_2d,
+                'icon_3d' => $this->gift->icon_3d,
             ],
             'session_total' => (float) $this->session->fresh()->total_coins_collected,
             'timestamp' => now()->toIso8601String(),

@@ -58,7 +58,7 @@ class StreamGiftController extends Controller
             );
 
             // Broadcast the gift event to the stream channel
-            broadcast(new GiftSentEvent($sender, $streamer, $gift, $session))->toOthers();
+            broadcast(new GiftSentEvent($sender, $streamer, $gift, $session));
 
             // Update stream goals if any are set
             $goals = $liveStream->goals ?? [];

@@ -46,6 +46,7 @@ class GiftSentEvent implements ShouldBroadcast
                 'id' => $this->gift->id,
                 'name' => $this->gift->name,
                 'coin_price' => (float) $this->gift->coin_price,
+                'description' => $this->gift->description,
                 'icon_url' => $this->gift->icon_url,
                 'icon_2d' => $this->gift->icon_2d,
                 'icon_3d' => $this->gift->icon_3d,

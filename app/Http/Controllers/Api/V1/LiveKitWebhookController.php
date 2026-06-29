@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Events\ViewerJoinedEvent;
+use App\Events\ViewerLeftEvent;
 use App\Http\Controllers\Controller;
 use App\Models\LiveStream;
+use App\Models\User;
 use Agence104\LiveKit\WebhookReceiver;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -83,8 +86,14 @@ class LiveKitWebhookController extends Controller
         }
 
         $session->viewerJoined();
+        $currentViewers = $session->fresh()->current_viewers;
 
-        Log::info("[LiveKit Webhook] viewer joined stream={$stream->id} current={$session->fresh()->current_viewers}");
+        // Resolve username from identity "viewer-{userId}"
+        $username = $this->resolveUsername($identity);
+
+        broadcast(new ViewerJoinedEvent($stream->id, $username, $currentViewers));
+
+        Log::info("[LiveKit Webhook] viewer joined stream={$stream->id} user={$username} current={$currentViewers}");
     }
 
     private function onParticipantLeft($stream, $session, $event): void
@@ -99,8 +108,29 @@ class LiveKitWebhookController extends Controller
         }
 
         $session->viewerLeft();
+        $currentViewers = $session->fresh()->current_viewers;
 
-        Log::info("[LiveKit Webhook] viewer left stream={$stream->id} current={$session->fresh()->current_viewers}");
+        $username = $this->resolveUsername($identity);
+
+        broadcast(new ViewerLeftEvent($stream->id, $username, $currentViewers));
+
+        Log::info("[LiveKit Webhook] viewer left stream={$stream->id} user={$username} current={$currentViewers}");
+    }
+
+    /**
+     * Resolve a display name from a LiveKit participant identity.
+     * Identity format: "viewer-{userId}" or "guest-{random}"
+     */
+    private function resolveUsername(string $identity): string
+    {
+        if (str_starts_with($identity, 'viewer-')) {
+            $userId = substr($identity, strlen('viewer-'));
+            $user   = User::find($userId);
+            if ($user) return $user->username;
+        }
+
+        // Guest or unknown identity — return a friendly label
+        return 'Gost';
     }
 
     private function onRoomFinished($stream): void

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\DepositRequest;
 use App\Http\Requests\TransferRequest;
 use App\Http\Requests\WithdrawRequest;
+use App\Models\AppSetting;
 use App\Models\BankAccount;
 use App\Models\PaymentMethod;
 use App\Models\Transaction;
@@ -277,10 +278,10 @@ class WalletController extends Controller
         }
 
         // Calculate fee
-        $feePercent = config('zalet.withdrawal.fee_percent', 2);
+        $feePercent = AppSetting::get('withdrawal_fee_percent', 2);
         $feeAmount = round($amount * ($feePercent / 100), 2);
         $netAmount = $amount - $feeAmount;
-        $exchangeRate = config('zalet.withdrawal.exchange_rate_coin_to_rsd', 1.2);
+        $exchangeRate = AppSetting::get('coin_to_rsd_rate', 1.2);
         $estimatedRsd = round($netAmount * $exchangeRate, 2);
 
         try {
@@ -325,10 +326,10 @@ class WalletController extends Controller
             return response()->json(['message' => 'Amount must be positive.'], 422);
         }
 
-        $feePercent = config('zalet.withdrawal.fee_percent', 2);
+        $feePercent = AppSetting::get('withdrawal_fee_percent', 2);
         $feeAmount = round($amount * ($feePercent / 100), 2);
         $netAmount = $amount - $feeAmount;
-        $exchangeRate = config('zalet.withdrawal.exchange_rate_coin_to_rsd', 1.2);
+        $exchangeRate = AppSetting::get('coin_to_rsd_rate', 1.2);
         $estimatedRsd = round($netAmount * $exchangeRate, 2);
 
         return response()->json([

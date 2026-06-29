@@ -11,6 +11,18 @@ class SettingsSeeder extends Seeder
     {
         $settings = [
             [
+                'key'         => 'coin_to_rsd_rate',
+                'value'       => '1.2',
+                'type'        => 'float',
+                'description' => '1 ZaletCoin = X RSD. Koristi se za obračun isplata kreatorima.',
+            ],
+            [
+                'key'         => 'withdrawal_fee_percent',
+                'value'       => '2',
+                'type'        => 'float',
+                'description' => 'Procenat koji platforma uzima pri isplati coinova (kreatori).',
+            ],
+            [
                 'key'         => 'transfer_fee_percent',
                 'value'       => '10',
                 'type'        => 'integer',

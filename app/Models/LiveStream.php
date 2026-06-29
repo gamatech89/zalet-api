@@ -31,6 +31,7 @@ class LiveStream extends Model
         'recording_duration',
         'recording_size',
         'has_recording',
+        'thumbnail_url',
     ];
 
     protected function casts(): array

@@ -424,7 +424,7 @@ class LiveStreamController extends Controller
         }
 
         $request->validate([
-            'recording' => 'required|file|mimetypes:video/webm,video/mp4,video/x-matroska|max:512000', // 500MB max
+            'recording' => 'required|file|mimetypes:video/webm,video/mp4,video/x-matroska|max:2097152', // 2 GB max
             'duration' => 'nullable|integer|min:1',
         ]);
 

@@ -104,9 +104,10 @@ Route::prefix('v1')->group(function () {
         Route::get('/users/suggested', [\App\Http\Controllers\Api\V1\UserController::class , 'suggested']);
         Route::get('/users/{user}', [\App\Http\Controllers\Api\V1\UserController::class , 'show']);
 
-        // Payment webhooks (public - verified via signature)
+        // Webhooks (public - verified via signature)
         Route::prefix('webhooks')->group(function () {
             Route::post('/raiffeisen', [PaymentWebhookController::class , 'handleNotification']);
+            Route::post('/livekit', [\App\Http\Controllers\Api\V1\LiveKitWebhookController::class, 'handle']);
         });
 
         // Payment callbacks (public - browser redirects after payment)

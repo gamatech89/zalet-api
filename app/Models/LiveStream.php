@@ -145,9 +145,10 @@ class LiveStream extends Model
     public function endStream(): void
     {
         $this->update(['is_live' => false]);
-        
+
         $this->currentSession?->update([
-            'end_time' => now(),
+            'end_time'        => now(),
+            'current_viewers' => 0,
         ]);
     }
 }

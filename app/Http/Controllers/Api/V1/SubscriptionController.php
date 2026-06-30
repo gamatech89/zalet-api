@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Services\GlobalSubscriptionService;
 use App\Services\RaiffeisenPaymentService;
@@ -73,7 +74,14 @@ class SubscriptionController extends Controller
      */
     public function current(Request $request): JsonResponse
     {
-        $subscription = $this->subscriptionService->getUserSubscription($request->user());
+        $user = $request->user();
+
+        // Return active OR past_due subscriptions (past_due keeps access during grace period)
+        $subscription = Subscription::where('user_id', $user->id)
+            ->whereIn('status', ['active', 'past_due'])
+            ->with(['plan', 'paymentMethod'])
+            ->latest()
+            ->first();
 
         if (!$subscription) {
             return response()->json([
@@ -183,17 +191,113 @@ class SubscriptionController extends Controller
         }
     }
 
+    /**
+     * Toggle auto-renewal and optionally set the payment method.
+     *
+     * POST /api/v1/subscriptions/auto-renew
+     */
+    public function toggleAutoRenew(Request $request): JsonResponse
+    {
+        $request->validate([
+            'enabled' => ['required', 'boolean'],
+            'payment_method_id' => ['nullable', 'uuid', 'exists:payment_methods,id'],
+        ]);
+
+        $user = $request->user();
+        $subscription = $user->subscriptions()
+            ->whereIn('status', ['active', 'past_due'])
+            ->latest()
+            ->first();
+
+        if (!$subscription) {
+            return response()->json([
+                'message' => 'No active subscription found.',
+            ], 404);
+        }
+
+        // Validate payment method belongs to user
+        if ($request->filled('payment_method_id')) {
+            $paymentMethod = $user->paymentMethods()->find($request->input('payment_method_id'));
+            if (!$paymentMethod) {
+                return response()->json([
+                    'message' => 'Payment method not found or does not belong to you.',
+                ], 422);
+            }
+        }
+
+        $updateData = ['auto_renew' => $request->boolean('enabled')];
+
+        if ($request->filled('payment_method_id')) {
+            $updateData['payment_method_id'] = $request->input('payment_method_id');
+        }
+
+        $subscription->update($updateData);
+
+        return response()->json([
+            'message' => $request->boolean('enabled')
+                ? 'Auto-renewal enabled.'
+                : 'Auto-renewal disabled.',
+            'data' => $this->formatSubscription($subscription->fresh()),
+        ]);
+    }
+
+    /**
+     * Update the renewal card for the current subscription.
+     *
+     * POST /api/v1/subscriptions/payment-method
+     */
+    public function setPaymentMethod(Request $request): JsonResponse
+    {
+        $request->validate([
+            'payment_method_id' => ['required', 'uuid', 'exists:payment_methods,id'],
+        ]);
+
+        $user = $request->user();
+        $subscription = $user->subscriptions()
+            ->whereIn('status', ['active', 'past_due'])
+            ->latest()
+            ->first();
+
+        if (!$subscription) {
+            return response()->json([
+                'message' => 'No active subscription found.',
+            ], 404);
+        }
+
+        $paymentMethod = $user->paymentMethods()->find($request->input('payment_method_id'));
+        if (!$paymentMethod) {
+            return response()->json([
+                'message' => 'Payment method not found or does not belong to you.',
+            ], 422);
+        }
+
+        $subscription->update(['payment_method_id' => $paymentMethod->id]);
+
+        return response()->json([
+            'message' => 'Renewal payment method updated.',
+            'data' => $this->formatSubscription($subscription->fresh()),
+        ]);
+    }
+
     protected function formatSubscription($subscription): array
     {
-        $subscription->load('plan');
+        $subscription->loadMissing(['plan', 'paymentMethod']);
+
+        $plan = $subscription->plan;
+        $planPrice = $subscription->billing_cycle === 'monthly'
+            ? ($plan->price_monthly ?? 0)
+            : ($plan->price_yearly ?? 0);
+
+        $canAutoRenew = $subscription->billing_cycle === 'monthly'
+            && $planPrice <= 2400;
 
         return [
             'id' => $subscription->id,
             'plan' => [
-                'id' => $subscription->plan->id,
-                'name' => $subscription->plan->name,
-                'slug' => $subscription->plan->slug,
-                'level' => $subscription->plan->level,
+                'id' => $plan->id,
+                'name' => $plan->name,
+                'slug' => $plan->slug,
+                'level' => $plan->level,
             ],
             'billing_cycle' => $subscription->billing_cycle,
             'price_paid' => $subscription->price_paid,
@@ -201,7 +305,17 @@ class SubscriptionController extends Controller
             'ends_at' => $subscription->ends_at->toIso8601String(),
             'status' => $subscription->status,
             'auto_renew' => $subscription->auto_renew,
-            'days_remaining' => max(0, now()->diffInDays($subscription->ends_at, false)),
+            'days_remaining' => max(0, (int) now()->diffInDays($subscription->ends_at, false)),
+            'next_billing_date' => $subscription->next_billing_date?->toDateString(),
+            'renewal_attempts' => $subscription->renewal_attempts ?? 0,
+            'last_renewal_error' => $subscription->last_renewal_error,
+            'can_auto_renew' => $canAutoRenew,
+            'renewal_mode' => $canAutoRenew ? 'automatic' : 'manual_link',
+            'payment_method' => $subscription->paymentMethod ? [
+                'id' => $subscription->paymentMethod->id,
+                'brand' => $subscription->paymentMethod->card_brand,
+                'last_four' => $subscription->paymentMethod->last_four,
+            ] : null,
         ];
     }
 }

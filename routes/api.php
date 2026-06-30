@@ -268,6 +268,8 @@ Route::prefix('v1')->group(function () {
                     Route::get('/current', [SubscriptionController::class , 'current']);
                     Route::post('/cancel', [SubscriptionController::class , 'cancel']);
                     Route::post('/change-plan', [SubscriptionController::class , 'changePlan']);
+                    Route::post('/auto-renew', [SubscriptionController::class , 'toggleAutoRenew']);
+                    Route::post('/payment-method', [SubscriptionController::class , 'setPaymentMethod']);
                 });
 
                 // Plan limits & usage

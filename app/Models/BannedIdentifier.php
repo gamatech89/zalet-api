@@ -32,6 +32,11 @@ class BannedIdentifier extends Model
         return $query->where('type', 'ip');
     }
 
+    public function scopeEmailDomains(Builder $query): Builder
+    {
+        return $query->where('type', 'email_domain');
+    }
+
     public function bannedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'banned_by');

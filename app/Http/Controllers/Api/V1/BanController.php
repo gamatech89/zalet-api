@@ -21,7 +21,7 @@ class BanController extends Controller
         $query = BannedIdentifier::with('bannedByUser:id,username')
             ->orderBy('created_at', 'desc');
 
-        if ($request->filled('type') && in_array($request->type, ['email', 'ip'])) {
+        if ($request->filled('type') && in_array($request->type, ['email', 'ip', 'email_domain'])) {
             $query->where('type', $request->type);
         }
 
@@ -35,10 +35,16 @@ class BanController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'type'   => ['required', Rule::in(['email', 'ip'])],
+            'type'   => ['required', Rule::in(['email', 'ip', 'email_domain'])],
             'value'  => ['required', 'string', 'max:255'],
             'reason' => ['nullable', 'string', 'max:255'],
         ]);
+
+        $typeLabel = match ($validated['type']) {
+            'email'        => 'email',
+            'ip'           => 'IP',
+            'email_domain' => 'email domena',
+        };
 
         try {
             $ban = BannedIdentifier::create([
@@ -53,7 +59,7 @@ class BanController extends Controller
             return response()->json($ban, 201);
         } catch (UniqueConstraintViolationException) {
             return response()->json([
-                'message' => 'Ovaj ' . ($validated['type'] === 'email' ? 'email' : 'IP') . ' je već banovan.',
+                'message' => "Ovaj {$typeLabel} je već banovan.",
             ], 409);
         }
     }

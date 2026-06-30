@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\Api\V1\AdminController;
 use App\Http\Controllers\Api\V1\AdminGiftController;
-use App\Http\Controllers\Api\V1\AdminSettingsController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BankAccountController;
 use App\Http\Controllers\Api\V1\BoardController;
@@ -31,10 +30,8 @@ use App\Http\Controllers\Api\V1\SubscriptionController;
 use App\Http\Controllers\Api\V1\SubscriptionPlanController;
 use App\Http\Controllers\Api\V1\CreatorRequestController;
 use App\Http\Controllers\Api\V1\WalletController;
-use App\Http\Controllers\Api\V1\NotificationController;
-use App\Http\Controllers\Api\V1\BlockController;
 use App\Http\Controllers\Api\V1\BanController;
-use App\Http\Controllers\Api\V1\ReportController;
+use App\Http\Controllers\Api\V1\NotificationController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -70,17 +67,8 @@ Route::prefix('v1')->group(function () {
         Route::prefix('auth')->middleware('throttle:auth')->group(function () {
             Route::post('/register', [AuthController::class , 'register']);
             Route::post('/login', [AuthController::class , 'login']);
-            Route::post('/forgot-password', [AuthController::class , 'forgotPassword']);
-            Route::post('/reset-password', [AuthController::class , 'resetPassword']);
-            // Email verification (signed URL — no auth required, link comes from email)
-            Route::get('/verify-email/{id}/{hash}', [AuthController::class , 'verifyEmail'])
-                ->middleware('signed')
-                ->name('verification.verify');
-        });
-
-        // Resend verification (requires auth, not verified)
-        Route::post('/auth/verify-email/resend', [AuthController::class , 'resendVerification'])
-            ->middleware('auth:sanctum');
+        }
+        );
 
         // Gift catalog (public - anyone can view) - moderate rate limiting
         Route::get('/gifts', [GiftController::class , 'index'])->middleware('throttle:public');
@@ -105,10 +93,9 @@ Route::prefix('v1')->group(function () {
         Route::get('/users/suggested', [\App\Http\Controllers\Api\V1\UserController::class , 'suggested']);
         Route::get('/users/{user}', [\App\Http\Controllers\Api\V1\UserController::class , 'show']);
 
-        // Webhooks (public - verified via signature)
+        // Payment webhooks (public - verified via signature)
         Route::prefix('webhooks')->group(function () {
             Route::post('/raiffeisen', [PaymentWebhookController::class , 'handleNotification']);
-            Route::post('/livekit', [\App\Http\Controllers\Api\V1\LiveKitWebhookController::class, 'handle']);
         });
 
         // Payment callbacks (public - browser redirects after payment)
@@ -160,11 +147,9 @@ Route::prefix('v1')->group(function () {
             Route::post('/', [BoardController::class, 'store'])->middleware('auth:sanctum');
             Route::get('/{board:slug}', [BoardController::class , 'show']);
             Route::get('/{board:slug}/posts', [BoardPostController::class , 'index']);
-            Route::get('/{board:slug}/posts/{post}', [BoardPostController::class , 'show'])->whereUuid('post');
+            Route::get('/{board:slug}/posts/{post}', [BoardPostController::class , 'show']);
             Route::get('/{board:slug}/categories', [BoardAdminController::class , 'listCategories']);
             Route::get('/{board:slug}/members', [BoardAdminController::class , 'listMembers']);
-            Route::get('/{board:slug}/streams', [BoardController::class, 'streams']);
-            Route::post('/{board:slug}/streams', [BoardController::class, 'scheduleStream'])->middleware('auth:sanctum');
             Route::post('/{board:slug}/join', [BoardController::class, 'join'])->middleware('auth:sanctum');
             Route::post('/{board:slug}/leave', [BoardController::class, 'leave'])->middleware('auth:sanctum');
         });
@@ -172,7 +157,6 @@ Route::prefix('v1')->group(function () {
         // Live Streaming (public - anyone can browse & watch)
         Route::prefix('streams')->group(function () {
             Route::get('/live', [LiveStreamController::class , 'live']);
-            Route::get('/upcoming', [LiveStreamController::class , 'upcoming']);
             Route::get('/{liveStream}', [LiveStreamController::class , 'show'])
                 ->where('liveStream', '[0-9a-f\-]{36}');
             Route::get('/{liveStream}/token', [LiveStreamController::class , 'viewerToken'])
@@ -185,7 +169,7 @@ Route::prefix('v1')->group(function () {
      |--------------------------------------------------------------------------
      */
 
-        Route::middleware(['auth:sanctum', 'email.verified'])->group(function () {
+        Route::middleware('auth:sanctum')->group(function () {
 
             // Auth routes (protected)
             Route::prefix('auth')->group(function () {
@@ -218,7 +202,6 @@ Route::prefix('v1')->group(function () {
                 Route::prefix('payment-methods')->group(function () {
                     Route::get('/', [PaymentMethodController::class, 'index']);
                     Route::post('/', [PaymentMethodController::class, 'store']);
-                    Route::post('/add-card', [PaymentMethodController::class, 'addCard']);
                     Route::put('/{paymentMethod}/default', [PaymentMethodController::class, 'setDefault']);
                     Route::delete('/', [PaymentMethodController::class, 'destroyAll']);
                     Route::delete('/{paymentMethod}', [PaymentMethodController::class, 'destroy']);
@@ -261,15 +244,12 @@ Route::prefix('v1')->group(function () {
                 Route::get('/media/{media}/comments', [\App\Http\Controllers\Api\V1\MediaCommentController::class, 'index']);
                 Route::post('/media/{media}/comments', [\App\Http\Controllers\Api\V1\MediaCommentController::class, 'store']);
                 Route::delete('/media/{media}/comments/{comment}', [\App\Http\Controllers\Api\V1\MediaCommentController::class, 'destroy']);
-                Route::post('/media/{media}/comments/{comment}/like', [\App\Http\Controllers\Api\V1\MediaCommentController::class, 'toggleLike']);
                 // Subscriptions (global plan-based)
                 Route::prefix('subscriptions')->group(function () {
                     Route::post('/', [SubscriptionController::class , 'subscribe']);
                     Route::get('/current', [SubscriptionController::class , 'current']);
                     Route::post('/cancel', [SubscriptionController::class , 'cancel']);
                     Route::post('/change-plan', [SubscriptionController::class , 'changePlan']);
-                    Route::post('/auto-renew', [SubscriptionController::class , 'toggleAutoRenew']);
-                    Route::post('/payment-method', [SubscriptionController::class , 'setPaymentMethod']);
                 });
 
                 // Plan limits & usage
@@ -303,7 +283,6 @@ Route::prefix('v1')->group(function () {
                     // Scena (long-form video upload + embed) - creator only
                     Route::post('/scena/embed', [ScenaController::class , 'embed']);
                     Route::post('/scena', [ScenaController::class , 'store']);
-                    Route::post('/scena/{media}', [ScenaController::class , 'update']);
                     Route::delete('/scena/{media}', [ScenaController::class , 'destroy']);
 
                     // Live Streaming management - creator only
@@ -321,13 +300,12 @@ Route::prefix('v1')->group(function () {
                         Route::delete('/schedule/{liveStream}', [StreamScheduleController::class , 'destroy']);
                         // Stream goals
                         Route::put('/{liveStream}/goals', [StreamGoalController::class , 'update']);
+                        Route::post('/{liveStream}/goals/{index}/progress', [StreamGoalController::class , 'progress']);
                     });
                 });
 
                 // Board Admin (auth required)
                 Route::prefix('boards/{board:slug}')->group(function () {
-                    Route::patch('/', [BoardAdminController::class, 'updateBoard']);
-                    Route::post('/cover', [BoardAdminController::class, 'updateCover']);
                     Route::post('/posts', [BoardPostController::class , 'store']);
                     Route::post('/upload-image', [BoardPostController::class , 'uploadImage']);
                     Route::delete('/posts/{post}', [BoardPostController::class , 'destroy']);
@@ -357,52 +335,17 @@ Route::prefix('v1')->group(function () {
                     Route::post('/read-all', [NotificationController::class, 'markAllRead']);
                 });
 
-                // Group discovery (all public groups + user's own groups)
-                Route::get('/groups', [ConversationController::class, 'groups']);
-
                 // Messaging (Sprint 4)
                 Route::prefix('conversations')->group(function () {
-                    Route::get('/', [ConversationController::class, 'index']);
-                    Route::post('/', [ConversationController::class, 'store']);
-                    Route::get('/unread-count', [ConversationController::class, 'unreadCount']);
-                    // Static prefixes must come before /{conversation} to avoid UUID binding collision
-                    Route::get('/invite/{inviteCode}', [ConversationController::class, 'groupInfo']);
-                    Route::get('/join/{inviteCode}', [ConversationController::class, 'joinByCode'])->middleware('throttle:chat');
-                    Route::get('/{conversation}', [ConversationController::class, 'show']);
-                    Route::patch('/{conversation}', [ConversationController::class, 'update']);
-                    Route::get('/{conversation}/messages', [MessageController::class, 'index']);
-                    Route::post('/{conversation}/messages', [MessageController::class, 'store'])->middleware('throttle:chat');
-                    Route::get('/{conversation}/messages/around/{message}', [MessageController::class, 'around']);
-                    Route::patch('/{conversation}/messages/{message}', [MessageController::class, 'update']);
-                    Route::delete('/{conversation}/messages/{message}', [MessageController::class, 'destroy']);
-                    Route::post('/{conversation}/messages/{message}/reactions', [MessageController::class, 'addReaction'])->middleware('throttle:chat');
-                    Route::post('/{conversation}/typing', [MessageController::class, 'typing']);
-                    // Group member management
-                    Route::delete('/{conversation}/members/{member}/messages', [MessageController::class, 'destroyUserMessages']);
-                    Route::post('/{conversation}/members', [ConversationController::class, 'addMembers']);
-                    Route::delete('/{conversation}/members/{member}', [ConversationController::class, 'kickMember']);
-                    Route::patch('/{conversation}/members/{member}/role', [ConversationController::class, 'updateMemberRole']);
-                    // Group ban management
-                    Route::post('/{conversation}/bans', [ConversationController::class, 'banMember']);
-                    Route::delete('/{conversation}/bans/{member}', [ConversationController::class, 'unbanMember']);
-                    // Leave group
-                    Route::delete('/{conversation}/leave', [ConversationController::class, 'leave']);
-                    Route::post('/{conversation}/read', [ConversationController::class, 'markRead']);
-                    // Pinned message
-                    Route::post('/{conversation}/pin-message', [ConversationController::class, 'pinMessage']);
-                    Route::delete('/{conversation}/pin-message', [ConversationController::class, 'unpinMessage']);
-                });
-
-                // Blocks
-                Route::prefix('blocks')->group(function () {
-                    Route::get('/', [BlockController::class, 'index']);
-                    Route::post('/', [BlockController::class, 'store']);
-                    Route::get('/{user}', [BlockController::class, 'check']);
-                    Route::delete('/{user}', [BlockController::class, 'destroy']);
-                });
-
-                // Reports
-                Route::post('/reports', [ReportController::class, 'store']);
+                    Route::get('/', [ConversationController::class , 'index']);
+                    Route::post('/', [ConversationController::class , 'store']);
+                    Route::get('/{conversation}', [ConversationController::class , 'show']);
+                    Route::get('/{conversation}/messages', [MessageController::class , 'index']);
+                    Route::post('/{conversation}/messages', [MessageController::class , 'store']);
+                    Route::post('/{conversation}/messages/{message}/reactions', [MessageController::class , 'addReaction']);
+                    Route::post('/{conversation}/typing', [MessageController::class , 'typing']);
+                }
+                );
 
                 // Admin Routes (Sprint 5)
                 Route::prefix('admin')
@@ -411,25 +354,22 @@ Route::prefix('v1')->group(function () {
                 Route::get('/stats', [AdminController::class , 'stats']);
                 Route::get('/users', [AdminController::class , 'listUsers']);
                 Route::patch('/users/{user}', [AdminController::class , 'updateUser']);
-                Route::delete('/users/{user}', [AdminController::class , 'deleteUser']);
                 Route::post('/users/{user}/founder', [AdminController::class , 'markFounder']);
-                Route::post('/users/{user}/suspend', [AdminController::class, 'suspendUser']);
-                Route::delete('/users/{user}/suspend', [AdminController::class, 'unsuspendUser']);
                 Route::get('/transactions', [AdminController::class , 'listTransactions']);
                 Route::get('/media', [AdminController::class , 'listMedia']);
                 Route::delete('/media/{media}', [AdminController::class , 'deleteMedia']);
                 Route::get('/streams', [AdminController::class , 'listStreams']);
                 Route::post('/streams/{liveStream}/end', [AdminController::class , 'endStream']);
 
-                // Moment approval
-                Route::get('/moments/pending', [AdminController::class, 'pendingMoments']);
-                Route::post('/moments/{media}/approve', [AdminController::class, 'approveMoment']);
-                Route::post('/moments/{media}/reject', [AdminController::class, 'rejectMoment']);
-
-                // Community management
-                Route::get('/communities', [AdminController::class, 'listCommunities']);
+                // Community approval
                 Route::get('/communities/pending', [AdminController::class, 'listPendingCommunities']);
                 Route::patch('/communities/{board}', [AdminController::class, 'reviewCommunity']);
+
+                // Ban management (email, IP, email_domain)
+                Route::get('/bans', [BanController::class, 'index']);
+                Route::post('/bans', [BanController::class, 'store']);
+                Route::delete('/bans/{ban}', [BanController::class, 'destroy']);
+                Route::post('/users/{user}/ban', [BanController::class, 'banUser']);
 
                 // Gift Management
                 Route::patch('/gifts/reorder', [AdminGiftController::class, 'reorder']);
@@ -440,31 +380,11 @@ Route::prefix('v1')->group(function () {
                 Route::delete('/gifts/{gift}', [AdminGiftController::class, 'destroy']);
                 Route::post('/gifts/{gift}/icon', [AdminGiftController::class, 'uploadIcon']);
 
-                // Reports
-                Route::get('/reports', [ReportController::class, 'adminIndex']);
-                Route::patch('/reports/{report}', [ReportController::class, 'adminUpdate']);
-
                 // Gift Categories
                 Route::get('/gift-categories', [AdminGiftController::class, 'categories']);
                 Route::post('/gift-categories', [AdminGiftController::class, 'storeCategory']);
                 Route::put('/gift-categories/{giftCategory}', [AdminGiftController::class, 'updateCategory']);
                 Route::delete('/gift-categories/{giftCategory}', [AdminGiftController::class, 'destroyCategory']);
-
-                // Coin Packages
-                Route::get('/coin-packages', [CoinPackageController::class, 'adminIndex']);
-                Route::post('/coin-packages', [CoinPackageController::class, 'store']);
-                Route::put('/coin-packages/{package}', [CoinPackageController::class, 'update']);
-                Route::delete('/coin-packages/{package}', [CoinPackageController::class, 'destroy']);
-
-                // Economy Settings
-                Route::get('/settings', [AdminSettingsController::class, 'index']);
-                Route::put('/settings/{key}', [AdminSettingsController::class, 'update']);
-
-                // Ban Management
-                Route::get('/bans', [BanController::class, 'index']);
-                Route::post('/bans', [BanController::class, 'store']);
-                Route::delete('/bans/{ban}', [BanController::class, 'destroy']);
-                Route::post('/users/{user}/ban', [BanController::class, 'banUser']);
             }
             );
 

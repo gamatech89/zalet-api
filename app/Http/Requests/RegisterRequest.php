@@ -4,37 +4,19 @@ namespace App\Http\Requests;
 
 use App\Models\BannedIdentifier;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class RegisterRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
-        $bannedEmails = BannedIdentifier::emails()->pluck('value')->all();
-        $bannedIps    = BannedIdentifier::ips()->pluck('value')->all();
-
         return [
-            'email' => [
-                'required',
-                'string',
-                'email',
-                'max:255',
-                'unique:users,email',
-                Rule::notIn($bannedEmails),
-            ],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'username' => [
                 'required',
                 'string',
@@ -44,30 +26,38 @@ class RegisterRequest extends FormRequest
                 'unique:users,username',
             ],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
-            '_ip_check' => [
-                Rule::notIn($bannedIps),
-            ],
         ];
     }
 
-    /**
-     * Prepare the data for validation.
-     * Inject the request IP so we can validate it using the rules array.
-     */
-    protected function prepareForValidation(): void
+    public function after(): array
     {
-        $this->merge(['_ip_check' => $this->ip()]);
+        return [
+            function (Validator $validator) {
+                if ($validator->errors()->hasAny(['email'])) {
+                    return;
+                }
+
+                $email  = strtolower(trim($this->input('email', '')));
+                $domain = substr($email, strpos($email, '@') + 1);
+                $ip     = $this->ip();
+
+                $blocked = BannedIdentifier::where(function ($q) use ($email, $domain, $ip) {
+                    $q->where(['type' => 'email', 'value' => $email])
+                      ->orWhere(['type' => 'email_domain', 'value' => $domain])
+                      ->orWhere(['type' => 'ip', 'value' => $ip]);
+                })->exists();
+
+                if ($blocked) {
+                    $validator->errors()->add('email', 'Registracija nije moguća.');
+                }
+            },
+        ];
     }
 
-    /**
-     * Get custom validation messages.
-     */
     public function messages(): array
     {
         return [
-            'username.regex'      => 'Username may only contain letters, numbers, and underscores.',
-            'email.not_in'        => 'This email address is not allowed to register.',
-            '_ip_check.not_in'    => 'Registration is not allowed from your current IP address.',
+            'username.regex' => 'Username may only contain letters, numbers, and underscores.',
         ];
     }
 }

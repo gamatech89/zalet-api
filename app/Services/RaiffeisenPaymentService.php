@@ -295,11 +295,6 @@ class RaiffeisenPaymentService
 
         $dataString = implode(';', $baseFields) . ';';
 
-        // When UPCToken service is active, UPC appends UPCToken to the signature string.
-        $dataStringWithToken = !empty($data['UPCToken'])
-            ? implode(';', $baseFields) . ';' . $data['UPCToken'] . ';'
-            : null;
-
         $signatureRaw = base64_decode($data['Signature'] ?? '');
 
         // Load the UPC certificate
@@ -318,17 +313,34 @@ class RaiffeisenPaymentService
             $key = $key->withHash('sha512')->withPadding(\phpseclib3\Crypt\RSA::SIGNATURE_PKCS1);
             $result = $key->verify($dataString, $signatureRaw);
 
-            // If standard string fails and UPCToken is present, try variants with token fields appended.
+            // If standard string fails and UPCToken is present, try variants with token fields.
             if (!$result && !empty($data['UPCToken'])) {
+                $token    = $data['UPCToken'];
+                $tokenExp = $data['UPCTokenExp'] ?? '';
+
+                // Try with SHA256 as well (UPCToken service may use different hash)
+                $key256 = \phpseclib3\Crypt\PublicKeyLoader::load(file_get_contents($certPath));
+                $key256 = $key256->withHash('sha256')->withPadding(\phpseclib3\Crypt\RSA::SIGNATURE_PKCS1);
+
+                $baseStr = implode(';', $baseFields);
                 $variants = [
-                    'token_only'     => implode(';', $baseFields) . ';' . $data['UPCToken'] . ';',
-                    'token_and_exp'  => implode(';', $baseFields) . ';' . $data['UPCToken'] . ';' . ($data['UPCTokenExp'] ?? '') . ';',
+                    // SHA512 variants — token appended after ApprovalCode
+                    'sha512_token'         => ['key' => $key,    'str' => "{$baseStr};{$token};"],
+                    'sha512_token_exp'     => ['key' => $key,    'str' => "{$baseStr};{$token};{$tokenExp};"],
+                    // SHA512 — token before TranCode/ApprovalCode
+                    'sha512_token_before'  => ['key' => $key,    'str' => implode(';', array_slice($baseFields, 0, 8)) . ";{$token};" . implode(';', array_slice($baseFields, 8)) . ';'],
+                    // SHA256 variants
+                    'sha256_standard'      => ['key' => $key256, 'str' => "{$baseStr};"],
+                    'sha256_token'         => ['key' => $key256, 'str' => "{$baseStr};{$token};"],
+                    'sha256_token_exp'     => ['key' => $key256, 'str' => "{$baseStr};{$token};{$tokenExp};"],
                 ];
-                foreach ($variants as $label => $variant) {
-                    if ($key->verify($variant, $signatureRaw)) {
+
+                foreach ($variants as $label => $v) {
+                    if ($v['key']->verify($v['str'], $signatureRaw)) {
                         $result = true;
                         Log::info('Raiffeisen signature verified with variant: ' . $label, [
                             'order_id' => $data['OrderID'] ?? 'unknown',
+                            'str'      => $v['str'],
                         ]);
                         break;
                     }

@@ -335,15 +335,32 @@ Route::prefix('v1')->group(function () {
                     Route::post('/read-all', [NotificationController::class, 'markAllRead']);
                 });
 
+                // Group discovery
+                Route::get('/groups', [ConversationController::class, 'groups']);
+
                 // Messaging (Sprint 4)
                 Route::prefix('conversations')->group(function () {
                     Route::get('/', [ConversationController::class , 'index']);
                     Route::post('/', [ConversationController::class , 'store']);
+                    Route::get('/unread-count', [ConversationController::class, 'unreadCount']);
+                    Route::get('/invite/{inviteCode}', [ConversationController::class, 'groupInfo']);
+                    Route::get('/join/{inviteCode}', [ConversationController::class, 'joinByCode'])->middleware('throttle:chat');
                     Route::get('/{conversation}', [ConversationController::class , 'show']);
+                    Route::patch('/{conversation}', [ConversationController::class, 'update']);
                     Route::get('/{conversation}/messages', [MessageController::class , 'index']);
                     Route::post('/{conversation}/messages', [MessageController::class , 'store']);
                     Route::post('/{conversation}/messages/{message}/reactions', [MessageController::class , 'addReaction']);
+                    Route::delete('/{conversation}/messages/{message}', [MessageController::class, 'destroy']);
                     Route::post('/{conversation}/typing', [MessageController::class , 'typing']);
+                    Route::post('/{conversation}/read', [ConversationController::class, 'markRead']);
+                    Route::post('/{conversation}/members', [ConversationController::class, 'addMembers']);
+                    Route::delete('/{conversation}/members/{member}', [ConversationController::class, 'kickMember']);
+                    Route::patch('/{conversation}/members/{member}/role', [ConversationController::class, 'updateMemberRole']);
+                    Route::post('/{conversation}/bans', [ConversationController::class, 'banMember']);
+                    Route::delete('/{conversation}/bans/{member}', [ConversationController::class, 'unbanMember']);
+                    Route::delete('/{conversation}/leave', [ConversationController::class, 'leave']);
+                    Route::post('/{conversation}/pin-message', [ConversationController::class, 'pinMessage']);
+                    Route::delete('/{conversation}/pin-message', [ConversationController::class, 'unpinMessage']);
                 }
                 );
 

@@ -242,6 +242,91 @@ class RaiffeisenPaymentService
     }
 
     /**
+     * Create a subscription tokenized payment using a saved card (auto-renewal).
+     *
+     * Uses ZSUB- order prefix so the webhook routes to processSubscriptionPayment().
+     * payByToken is synchronous — TranCode=000 in the response means approved.
+     * The caller (SubscriptionRenewalService) handles success inline; the webhook
+     * is idempotent via raiffeisen_order_id check.
+     */
+    public function createSubscriptionTokenizedPayment(
+        User $user,
+        PaymentMethod $paymentMethod,
+        SubscriptionPlan $plan,
+        string $billingCycle,
+    ): array {
+        $orderId = $this->generateSubscriptionOrderId();
+        $amountRsd = $this->subscriptionService->calculatePrice($plan, $billingCycle);
+        $amountInParas = (int) round($amountRsd * 100);
+        $purchaseTime = now()->format('ymdHis');
+
+        $payload = [
+            'MerchantID' => $this->merchantId,
+            'TerminalID' => $this->terminalId,
+            'OrderID' => $orderId,
+            'UPCToken' => $paymentMethod->gateway_token,
+            'TotalAmount' => $amountInParas,
+            'Currency' => 941,
+            'PurchaseTime' => $purchaseTime,
+            'PurchaseDesc' => "Zalet {$plan->name} pretplata ({$billingCycle})",
+            'SD' => $this->generateSubscriptionSessionData(
+                $orderId, $amountInParas, $user->id, $plan->id, $billingCycle
+            ),
+        ];
+
+        $header = $this->base64UrlEncode(json_encode(['alg' => 'RS256']));
+        $payloadEncoded = $this->base64UrlEncode(json_encode($payload));
+        $dataToSign = "{$header}.{$payloadEncoded}";
+
+        $privateKey = openssl_pkey_get_private(
+            file_get_contents(config('zalet.raiffeisen.pem_path'))
+        );
+        openssl_sign($dataToSign, $signature, $privateKey, OPENSSL_ALGO_SHA256);
+        $signatureEncoded = $this->base64UrlEncode($signature);
+
+        $tokenPaymentUrl = preg_replace('/\/[^\/]+$/', '/payByToken', $this->gatewayUrl);
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::post($tokenPaymentUrl, [
+                'header' => $header,
+                'payload' => $payloadEncoded,
+                'signature' => $signatureEncoded,
+            ]);
+
+            $result = $response->json() ?? [];
+            $innerPayload = [];
+            if (isset($result['payload'])) {
+                $innerPayload = json_decode(
+                    base64_decode(strtr($result['payload'], '-_', '+/')), true
+                ) ?? [];
+            }
+            $tranCode = $innerPayload['TranCode'] ?? $result['TranCode'] ?? 'unknown';
+
+            Log::info('Subscription tokenized payment submitted', [
+                'user_id' => $user->id,
+                'plan_id' => $plan->id,
+                'order_id' => $orderId,
+                'amount_rsd' => $amountRsd,
+                'payment_method_id' => $paymentMethod->id,
+                'tran_code' => $tranCode,
+                'http_status' => $response->status(),
+            ]);
+
+            return [
+                'order_id' => $orderId,
+                'tran_code' => $tranCode,
+                'amount_rsd' => $amountRsd,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Subscription tokenized payment failed', [
+                'order_id' => $orderId,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
      * Base64URL encode (per RFC 7515 for JWS).
      */
     protected function base64UrlEncode(string $data): string
@@ -815,6 +900,16 @@ class RaiffeisenPaymentService
         if (!$sd || empty($sd['u']) || empty($sd['p'])) {
             Log::error('Invalid subscription session data', ['order_id' => $orderId]);
             return $this->buildWebhookResponse($data, 'reverse', 'Invalid session data');
+        }
+
+        // Idempotency: auto-renewal processes success inline; if the order_id is
+        // already stored on a subscription, the webhook is a no-op.
+        $existingByOrder = Subscription::where('raiffeisen_order_id', $orderId)->first();
+        if ($existingByOrder) {
+            Log::info('Subscription payment already processed (idempotency)', [
+                'order_id' => $orderId,
+            ]);
+            return $this->buildWebhookResponse($data, 'approve', 'ok');
         }
 
         $user = User::find($sd['u']);

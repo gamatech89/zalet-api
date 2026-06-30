@@ -318,13 +318,20 @@ class RaiffeisenPaymentService
             $key = $key->withHash('sha512')->withPadding(\phpseclib3\Crypt\RSA::SIGNATURE_PKCS1);
             $result = $key->verify($dataString, $signatureRaw);
 
-            // If standard string fails and UPCToken is present, try with token appended.
-            if (!$result && $dataStringWithToken) {
-                $result = $key->verify($dataStringWithToken, $signatureRaw);
-                if ($result) {
-                    Log::info('Raiffeisen signature verified with UPCToken appended', [
-                        'order_id' => $data['OrderID'] ?? 'unknown',
-                    ]);
+            // If standard string fails and UPCToken is present, try variants with token fields appended.
+            if (!$result && !empty($data['UPCToken'])) {
+                $variants = [
+                    'token_only'     => implode(';', $baseFields) . ';' . $data['UPCToken'] . ';',
+                    'token_and_exp'  => implode(';', $baseFields) . ';' . $data['UPCToken'] . ';' . ($data['UPCTokenExp'] ?? '') . ';',
+                ];
+                foreach ($variants as $label => $variant) {
+                    if ($key->verify($variant, $signatureRaw)) {
+                        $result = true;
+                        Log::info('Raiffeisen signature verified with variant: ' . $label, [
+                            'order_id' => $data['OrderID'] ?? 'unknown',
+                        ]);
+                        break;
+                    }
                 }
             }
 

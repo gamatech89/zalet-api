@@ -200,6 +200,17 @@ class RaiffeisenPaymentService
 
             $result = $response->json() ?? [];
 
+            // payByToken success response is JWS: {header, payload, signature}
+            // TranCode is inside the base64url-encoded payload, not at the top level.
+            // Error responses (4xx) are plain JSON with TranCode directly.
+            $innerPayload = [];
+            if (isset($result['payload'])) {
+                $innerPayload = json_decode(
+                    base64_decode(strtr($result['payload'], '-_', '+/')), true
+                ) ?? [];
+            }
+            $tranCode = $innerPayload['TranCode'] ?? $result['TranCode'] ?? 'unknown';
+
             Log::info('Tokenized payment submitted', [
                 'user_id' => $user->id,
                 'order_id' => $orderId,
@@ -208,12 +219,12 @@ class RaiffeisenPaymentService
                 'card_last_four' => $paymentMethod->last_four,
                 'token_url' => $tokenPaymentUrl,
                 'http_status' => $response->status(),
-                'response_tran_code' => $result['TranCode'] ?? 'unknown',
+                'response_tran_code' => $tranCode,
                 'response_body' => $response->body(),
             ]);
 
             // Check if token payment was immediately approved
-            if (($result['TranCode'] ?? '') === '000') {
+            if ($tranCode === '000') {
                 $this->coinService->confirmDeposit($transaction);
             }
 
@@ -258,33 +269,36 @@ class RaiffeisenPaymentService
             ? ($data['OrderID'] ?? '') . ',' . $data['Delay']
             : ($data['OrderID'] ?? '');
 
-        if (!empty($data['AltTotalAmount'])) {
-            $dataString = implode(';', [
-                $data['MerchantID'] ?? '',
-                $data['TerminalID'] ?? '',
-                $data['PurchaseTime'] ?? '',
-                $orderIdPart,
-                $data['XID'] ?? '',
-                ($data['Currency'] ?? '') . ',' . ($data['AltCurrency'] ?? ''),
-                ($data['TotalAmount'] ?? '') . ',' . ($data['AltTotalAmount'] ?? ''),
-                $data['SD'] ?? '',
-                $data['TranCode'] ?? '',
-                $data['ApprovalCode'] ?? '',
-            ]) . ';';
-        } else {
-            $dataString = implode(';', [
-                $data['MerchantID'] ?? '',
-                $data['TerminalID'] ?? '',
-                $data['PurchaseTime'] ?? '',
-                $orderIdPart,
-                $data['XID'] ?? '',
-                $data['Currency'] ?? '',
-                $data['TotalAmount'] ?? '',
-                $data['SD'] ?? '',
-                $data['TranCode'] ?? '',
-                $data['ApprovalCode'] ?? '',
-            ]) . ';';
-        }
+        $baseFields = !empty($data['AltTotalAmount']) ? [
+            $data['MerchantID'] ?? '',
+            $data['TerminalID'] ?? '',
+            $data['PurchaseTime'] ?? '',
+            $orderIdPart,
+            $data['XID'] ?? '',
+            ($data['Currency'] ?? '') . ',' . ($data['AltCurrency'] ?? ''),
+            ($data['TotalAmount'] ?? '') . ',' . ($data['AltTotalAmount'] ?? ''),
+            $data['SD'] ?? '',
+            $data['TranCode'] ?? '',
+            $data['ApprovalCode'] ?? '',
+        ] : [
+            $data['MerchantID'] ?? '',
+            $data['TerminalID'] ?? '',
+            $data['PurchaseTime'] ?? '',
+            $orderIdPart,
+            $data['XID'] ?? '',
+            $data['Currency'] ?? '',
+            $data['TotalAmount'] ?? '',
+            $data['SD'] ?? '',
+            $data['TranCode'] ?? '',
+            $data['ApprovalCode'] ?? '',
+        ];
+
+        $dataString = implode(';', $baseFields) . ';';
+
+        // When UPCToken service is active, UPC appends UPCToken to the signature string.
+        $dataStringWithToken = !empty($data['UPCToken'])
+            ? implode(';', $baseFields) . ';' . $data['UPCToken'] . ';'
+            : null;
 
         $signatureRaw = base64_decode($data['Signature'] ?? '');
 
@@ -304,10 +318,20 @@ class RaiffeisenPaymentService
             $key = $key->withHash('sha512')->withPadding(\phpseclib3\Crypt\RSA::SIGNATURE_PKCS1);
             $result = $key->verify($dataString, $signatureRaw);
 
+            // If standard string fails and UPCToken is present, try with token appended.
+            if (!$result && $dataStringWithToken) {
+                $result = $key->verify($dataStringWithToken, $signatureRaw);
+                if ($result) {
+                    Log::info('Raiffeisen signature verified with UPCToken appended', [
+                        'order_id' => $data['OrderID'] ?? 'unknown',
+                    ]);
+                }
+            }
+
             if (!$result) {
                 Log::warning('Raiffeisen signature mismatch — dataString used', [
-                    'order_id'    => $data['OrderID'] ?? 'unknown',
-                    'data_string' => $dataString,
+                    'order_id'        => $data['OrderID'] ?? 'unknown',
+                    'data_string'     => $dataString,
                     'has_upc_token'   => isset($data['UPCToken']),
                     'has_recurrent'   => isset($data['Recurrent']),
                     'has_alt_amount'  => isset($data['AltTotalAmount']),
@@ -408,7 +432,10 @@ class RaiffeisenPaymentService
             $hasUpcToken = !empty($data['UPCToken']);
             $hasRecurrent = !empty($data['Recurrent']);
             $hasProxyPan = !empty($data['ProxyPan']);
-            if (($hasUpcToken || $hasRecurrent) && $hasProxyPan) {
+            // Only save card when UPCToken is present — this means the cardholder
+            // checked the "save card" consent checkbox on the gateway page.
+            // Recurrent alone (Visa/MC network token) does not indicate consent.
+            if ($hasUpcToken && $hasProxyPan) {
                 $this->saveCardFromWebhook($data, $transaction->toWallet?->user_id ?? '');
             }
 
@@ -455,10 +482,9 @@ class RaiffeisenPaymentService
      */
     public function saveCardFromWebhook(array $data, string $userId): ?PaymentMethod
     {
-        // Raiffeisen sends the card token as 'UPCToken' (when UPC Token Service active)
-        // or as 'Recurrent' in standard flows — same value, different field name.
-        // When doing payByToken the stored value is always sent as 'UPCToken'.
-        $token = $data['UPCToken'] ?? $data['Recurrent'] ?? null;
+        // Only save card when UPCToken is present — the cardholder checked
+        // "Save the card for future payments" on the UPC gateway page.
+        $token = $data['UPCToken'] ?? null;
         $proxyPan = $data['ProxyPan'] ?? null;
 
         if (!$token || !$userId) {
@@ -691,14 +717,12 @@ class RaiffeisenPaymentService
         }
 
         $hasUpcToken = !empty($data['UPCToken']);
-        $hasRecurrent = !empty($data['Recurrent']);
-        if (($hasUpcToken || $hasRecurrent) && !empty($data['ProxyPan'])) {
+        if ($hasUpcToken && !empty($data['ProxyPan'])) {
             $this->saveCardFromWebhook($data, $userId);
             Log::info('Card saved via registration payment', [
-                'order_id' => $orderId,
-                'user_id' => $userId,
+                'order_id'      => $orderId,
+                'user_id'       => $userId,
                 'has_upc_token' => $hasUpcToken,
-                'has_recurrent' => $hasRecurrent,
             ]);
         }
 

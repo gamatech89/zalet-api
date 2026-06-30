@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
+use App\Jobs\ProcessSubscriptionRenewals;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -13,3 +14,8 @@ Artisan::command('inspire', function () {
 // DM chats: attachments older than 365 days.
 // Message text is never deleted.
 Schedule::command('chat:prune-attachments')->weekly()->sundays()->at('02:00');
+
+// Process subscription renewals daily at 07:00 Belgrade time.
+Schedule::job(ProcessSubscriptionRenewals::class)
+    ->dailyAt('07:00')
+    ->timezone('Europe/Belgrade');

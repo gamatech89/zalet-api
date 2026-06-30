@@ -315,24 +315,43 @@ class RaiffeisenPaymentService
 
             // If standard string fails and UPCToken is present, try variants with token fields.
             if (!$result && !empty($data['UPCToken'])) {
-                $token    = $data['UPCToken'];
-                $tokenExp = $data['UPCTokenExp'] ?? '';
+                $token     = $data['UPCToken'];
+                $tokenLc   = strtolower($token);
+                $tokenExp  = $data['UPCTokenExp'] ?? '';
+                $recurrent = $data['Recurrent'] ?? '';
 
-                // Try with SHA256 as well (UPCToken service may use different hash)
                 $key256 = \phpseclib3\Crypt\PublicKeyLoader::load(file_get_contents($certPath));
                 $key256 = $key256->withHash('sha256')->withPadding(\phpseclib3\Crypt\RSA::SIGNATURE_PKCS1);
+                $key1 = \phpseclib3\Crypt\PublicKeyLoader::load(file_get_contents($certPath));
+                $key1 = $key1->withHash('sha1')->withPadding(\phpseclib3\Crypt\RSA::SIGNATURE_PKCS1);
 
-                $baseStr = implode(';', $baseFields);
+                $baseStr  = implode(';', $baseFields);
+                // baseFields[0..7] = MerchantID..SD, [8]=TranCode, [9]=ApprovalCode
+                $preSD    = implode(';', array_slice($baseFields, 0, 8)); // ..;SD (no trailing ;)
+                $postSD   = implode(';', array_slice($baseFields, 8));    // TranCode;ApprovalCode
+
                 $variants = [
-                    // SHA512 variants — token appended after ApprovalCode
-                    'sha512_token'         => ['key' => $key,    'str' => "{$baseStr};{$token};"],
-                    'sha512_token_exp'     => ['key' => $key,    'str' => "{$baseStr};{$token};{$tokenExp};"],
-                    // SHA512 — token before TranCode/ApprovalCode
-                    'sha512_token_before'  => ['key' => $key,    'str' => implode(';', array_slice($baseFields, 0, 8)) . ";{$token};" . implode(';', array_slice($baseFields, 8)) . ';'],
+                    // SHA512 — token at end
+                    'sha512_token'              => ['key' => $key,    'str' => "{$baseStr};{$token};"],
+                    'sha512_token_exp'          => ['key' => $key,    'str' => "{$baseStr};{$token};{$tokenExp};"],
+                    // SHA512 — token between SD and TranCode
+                    'sha512_token_before'       => ['key' => $key,    'str' => "{$preSD};{$token};{$postSD};"],
+                    // SHA512 — token between TranCode and ApprovalCode
+                    'sha512_token_mid'          => ['key' => $key,    'str' => implode(';', array_slice($baseFields, 0, 9)) . ";{$token};" . ($baseFields[9] ?? '') . ';'],
+                    // SHA512 — Recurrent (other token field also present in webhook)
+                    'sha512_recurrent'          => ['key' => $key,    'str' => "{$baseStr};{$recurrent};"],
+                    'sha512_recurrent_token'    => ['key' => $key,    'str' => "{$baseStr};{$recurrent};{$token};"],
+                    'sha512_token_recurrent'    => ['key' => $key,    'str' => "{$baseStr};{$token};{$recurrent};"],
+                    'sha512_token_lc'           => ['key' => $key,    'str' => "{$baseStr};{$tokenLc};"],
                     // SHA256 variants
-                    'sha256_standard'      => ['key' => $key256, 'str' => "{$baseStr};"],
-                    'sha256_token'         => ['key' => $key256, 'str' => "{$baseStr};{$token};"],
-                    'sha256_token_exp'     => ['key' => $key256, 'str' => "{$baseStr};{$token};{$tokenExp};"],
+                    'sha256_standard'           => ['key' => $key256, 'str' => "{$baseStr};"],
+                    'sha256_token'              => ['key' => $key256, 'str' => "{$baseStr};{$token};"],
+                    'sha256_token_exp'          => ['key' => $key256, 'str' => "{$baseStr};{$token};{$tokenExp};"],
+                    'sha256_recurrent'          => ['key' => $key256, 'str' => "{$baseStr};{$recurrent};"],
+                    // SHA1 — some older UPC implementations use SHA1
+                    'sha1_standard'             => ['key' => $key1,   'str' => "{$baseStr};"],
+                    'sha1_token'                => ['key' => $key1,   'str' => "{$baseStr};{$token};"],
+                    'sha1_recurrent'            => ['key' => $key1,   'str' => "{$baseStr};{$recurrent};"],
                 ];
 
                 foreach ($variants as $label => $v) {

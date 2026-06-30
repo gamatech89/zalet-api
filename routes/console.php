@@ -18,4 +18,5 @@ Schedule::command('chat:prune-attachments')->weekly()->sundays()->at('02:00');
 // Process subscription renewals daily at 07:00 Belgrade time.
 Schedule::job(ProcessSubscriptionRenewals::class)
     ->dailyAt('07:00')
-    ->timezone('Europe/Belgrade');
+    ->timezone('Europe/Belgrade')
+    ->withoutOverlapping();

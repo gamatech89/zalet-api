@@ -20,7 +20,7 @@ class PlanLimitsService
     public function getLimits(User $user): array
     {
         $subscription = Subscription::where('user_id', $user->id)
-            ->active()
+            ->hasAccess()
             ->with('plan')
             ->first();
 
@@ -44,7 +44,7 @@ class PlanLimitsService
     public function getUserLevel(User $user): int
     {
         $subscription = Subscription::where('user_id', $user->id)
-            ->active()
+            ->hasAccess()
             ->with('plan')
             ->first();
 

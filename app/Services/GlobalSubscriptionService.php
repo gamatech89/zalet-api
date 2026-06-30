@@ -163,7 +163,7 @@ class GlobalSubscriptionService
     public function getUserSubscriptionLevel(User $user): int
     {
         $subscription = Subscription::where('user_id', $user->id)
-            ->active()
+            ->hasAccess()
             ->with('plan')
             ->first();
 
@@ -190,7 +190,7 @@ class GlobalSubscriptionService
     public function getUserSubscription(User $user): ?Subscription
     {
         return Subscription::where('user_id', $user->id)
-            ->active()
+            ->hasAccess()
             ->with('plan')
             ->first();
     }

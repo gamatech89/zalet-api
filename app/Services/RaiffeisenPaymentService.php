@@ -929,7 +929,7 @@ class RaiffeisenPaymentService
         try {
             // Check if this is a renewal or new subscription
             $existing = Subscription::where('user_id', $user->id)
-                ->whereIn('status', ['expired', 'cancelled'])
+                ->whereIn('status', ['expired', 'cancelled', 'past_due', 'active'])
                 ->latest()
                 ->first();
 

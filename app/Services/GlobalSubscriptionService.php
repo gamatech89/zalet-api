@@ -45,6 +45,9 @@ class GlobalSubscriptionService
                 'status' => 'active',
                 'auto_renew' => true,
                 'raiffeisen_order_id' => $raiffeisenOrderId,
+                'next_billing_date' => $billingCycle === 'monthly'
+                    ? now()->addMonth()->toDateString()
+                    : now()->addYear()->toDateString(),
             ]);
         });
     }
@@ -87,6 +90,9 @@ class GlobalSubscriptionService
                 'price_paid' => $pricePaid,
                 'raiffeisen_order_id' => $raiffeisenOrderId,
                 'cancelled_at' => null,
+                'next_billing_date' => $subscription->billing_cycle === 'monthly'
+                    ? now()->addMonth()->toDateString()
+                    : now()->addYear()->toDateString(),
             ]);
 
             return $subscription->fresh();
@@ -123,6 +129,9 @@ class GlobalSubscriptionService
                 'status' => 'active',
                 'auto_renew' => true,
                 'raiffeisen_order_id' => $raiffeisenOrderId,
+                'next_billing_date' => $billingCycle === 'monthly'
+                    ? now()->addMonth()->toDateString()
+                    : now()->addYear()->toDateString(),
             ]);
         });
     }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\PaymentMethod;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -22,6 +23,10 @@ class Subscription extends Model
         'auto_renew',
         'raiffeisen_order_id',
         'cancelled_at',
+        'payment_method_id',
+        'next_billing_date',
+        'renewal_attempts',
+        'last_renewal_error',
     ];
 
     protected function casts(): array
@@ -32,6 +37,8 @@ class Subscription extends Model
             'ends_at' => 'datetime',
             'auto_renew' => 'boolean',
             'cancelled_at' => 'datetime',
+            'next_billing_date' => 'date',
+            'renewal_attempts' => 'integer',
         ];
     }
 
@@ -45,6 +52,11 @@ class Subscription extends Model
     public function plan(): BelongsTo
     {
         return $this->belongsTo(SubscriptionPlan::class, 'subscription_plan_id');
+    }
+
+    public function paymentMethod(): BelongsTo
+    {
+        return $this->belongsTo(PaymentMethod::class);
     }
 
     // ── Scopes ──

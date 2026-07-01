@@ -14,6 +14,7 @@ use App\Services\CoinService;
 use App\Services\PlanLimitsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 
 class ConversationController extends Controller

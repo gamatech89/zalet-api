@@ -232,6 +232,29 @@ class CoinService
     /**
      * Request a withdrawal.
      */
+    public function spendOnFeature(User $user, float $amount, string $description): Transaction
+    {
+        return DB::transaction(function () use ($user, $amount, $description) {
+            $wallet = $this->ensureWallet($user);
+            $wallet = Wallet::where('id', $wallet->id)->lockForUpdate()->first();
+
+            if (!$wallet->hasBalance($amount)) {
+                throw new \RuntimeException('Insufficient balance.');
+            }
+
+            $wallet->decrement('balance', $amount);
+
+            return Transaction::create([
+                'from_wallet_id' => $wallet->id,
+                'to_wallet_id'   => $wallet->id,
+                'amount'         => $amount,
+                'type'           => 'purchase',
+                'status'         => 'completed',
+                'description'    => $description,
+            ]);
+        });
+    }
+
     public function requestWithdrawal(User $user, float $amount): Transaction
     {
         if ($amount <= 0) {

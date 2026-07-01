@@ -7,12 +7,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateConversationRequest;
 use App\Models\Block;
 use App\Models\Conversation;
+use App\Models\GroupUnlock;
 use App\Models\Message;
 use App\Models\User;
+use App\Services\CoinService;
 use App\Services\PlanLimitsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 
 class ConversationController extends Controller
@@ -605,10 +606,19 @@ class ConversationController extends Controller
         $planLimitsService = app(PlanLimitsService::class);
         $canJoin = $planLimitsService->canJoinGroup($user);
         if ($canJoin !== true) {
-            return response()->json([
-                'message' => $canJoin,
-                'error_type' => 'plan_limit',
-            ], 403);
+            $alreadyUnlocked = GroupUnlock::where('user_id', $user->id)
+                ->where('conversation_id', $conversation->id)
+                ->exists();
+
+            if (!$alreadyUnlocked) {
+                return response()->json([
+                    'message' => $canJoin,
+                    'error_type' => 'plan_limit',
+                    'can_unlock' => true,
+                    'unlock_cost' => 200,
+                    'group_id' => $conversation->id,
+                ], 403);
+            }
         }
 
         $conversation->users()->attach($user->id, ['joined_at' => now(), 'role' => 'member']);
@@ -642,6 +652,62 @@ class ConversationController extends Controller
         return response()->json([
             'unread_count' => $count,
         ]);
+    }
+
+    /**
+     * Delete a group (owner only).
+     * DELETE /api/v1/conversations/{conversation}
+     */
+    public function destroy(Request $request, Conversation $conversation): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$conversation->is_group) {
+            return response()->json(['message' => 'Cannot delete a direct conversation.'], 422);
+        }
+
+        if ($this->getUserRole($user, $conversation) !== 'owner') {
+            return response()->json(['message' => 'Only the group owner can delete this group.'], 403);
+        }
+
+        $conversation->delete();
+
+        return response()->json(['message' => 'Group deleted successfully.']);
+    }
+
+    /**
+     * Unlock a group for 200 coins (for free-plan users).
+     * POST /api/v1/conversations/{conversation}/unlock
+     */
+    public function unlockGroup(Request $request, Conversation $conversation, CoinService $coinService): JsonResponse
+    {
+        $user = $request->user();
+        $cost = 200;
+
+        if (!$conversation->is_group || !$conversation->is_public) {
+            return response()->json(['message' => 'Only public groups can be unlocked.'], 422);
+        }
+
+        if ($conversation->users()->where('users.id', $user->id)->exists()) {
+            return response()->json(['message' => 'You are already a member.'], 422);
+        }
+
+        if (GroupUnlock::where('user_id', $user->id)->where('conversation_id', $conversation->id)->exists()) {
+            return response()->json(['message' => 'Group already unlocked.', 'already_unlocked' => true]);
+        }
+
+        try {
+            $coinService->spendOnFeature($user, $cost, "Otključavanje grupe: {$conversation->name}");
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'message' => "Nedovoljno kovanica. Trebaš {$cost} ZC za otključavanje grupe.",
+                'balance_required' => $cost,
+            ], 422);
+        }
+
+        GroupUnlock::create(['user_id' => $user->id, 'conversation_id' => $conversation->id]);
+
+        return response()->json(['message' => 'Group unlocked! Možeš se sada pridružiti.']);
     }
 
     private function getConversationName(Conversation $conversation, $currentUser): string

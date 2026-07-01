@@ -383,6 +383,7 @@ Route::prefix('v1')->group(function () {
                     Route::patch('/{conversation}', [ConversationController::class, 'update']);
                     Route::get('/{conversation}/messages', [MessageController::class , 'index']);
                     Route::post('/{conversation}/messages', [MessageController::class , 'store']);
+                    Route::delete('/{conversation}/messages', [MessageController::class, 'clearAll']);
                     Route::get('/{conversation}/messages/around/{message}', [MessageController::class, 'around']);
                     Route::patch('/{conversation}/messages/{message}', [MessageController::class, 'update']);
                     Route::post('/{conversation}/messages/{message}/reactions', [MessageController::class , 'addReaction']);

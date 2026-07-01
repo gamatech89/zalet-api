@@ -26,6 +26,11 @@ class SendGiftRequest extends FormRequest
                 'integer',
                 'exists:gift_catalog,id',
             ],
+            'conversation_id' => [
+                'nullable',
+                'uuid',
+                'exists:conversations,id',
+            ],
         ];
     }
 

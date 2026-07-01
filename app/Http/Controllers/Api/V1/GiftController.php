@@ -74,27 +74,39 @@ class GiftController extends Controller
                 gift: $gift,
             );
 
-            // Find or create the DM conversation between sender and recipient
-            $conversation = $sender->conversations()
-                ->where('is_group', false)
-                ->whereHas('users', fn ($q) => $q->where('users.id', $recipient->id))
-                ->first();
+            $conversationId = $request->validated('conversation_id');
 
-            if (!$conversation) {
-                $conversation = Conversation::create(['is_group' => false]);
-                $conversation->users()->attach([
-                    $sender->id => ['joined_at' => now()],
-                    $recipient->id => ['joined_at' => now()],
-                ]);
+            if ($conversationId) {
+                // Group gift: post to the provided group conversation
+                $conversation = Conversation::findOrFail($conversationId);
+                if (!$conversation->users()->where('users.id', $sender->id)->exists()) {
+                    return response()->json(['message' => 'Not a member of this conversation.'], 403);
+                }
+            } else {
+                // DM gift: find or create the DM conversation
+                $conversation = $sender->conversations()
+                    ->where('is_group', false)
+                    ->whereHas('users', fn ($q) => $q->where('users.id', $recipient->id))
+                    ->first();
+
+                if (!$conversation) {
+                    $conversation = Conversation::create(['is_group' => false]);
+                    $conversation->users()->attach([
+                        $sender->id => ['joined_at' => now()],
+                        $recipient->id => ['joined_at' => now()],
+                    ]);
+                }
             }
 
-            // Create a gift message in the conversation
+            // Always include recipient info so group chats can display "X → Y"
             $giftContent = json_encode([
                 'name' => $gift->name,
                 'coin_price' => (float) $gift->coin_price,
                 'icon_url' => $gift->icon_url,
                 'icon_3d' => $gift->icon_3d,
                 'description' => $gift->description,
+                'recipient_id' => $recipient->id,
+                'recipient_username' => $recipient->username,
             ]);
 
             $message = $conversation->messages()->create([

@@ -103,8 +103,9 @@ class MessageController extends Controller
             $mime = $file->getMimeType();
             if (str_starts_with($mime, 'image/')) {
                 $data['message_type'] = 'image';
-            }
-            else {
+            } elseif (str_starts_with($mime, 'audio/')) {
+                $data['message_type'] = 'audio';
+            } else {
                 $data['message_type'] = 'file';
             }
         }
@@ -332,6 +333,45 @@ class MessageController extends Controller
         }
 
         return response()->json(['message' => "Deleted {$messageIds->count()} messages."]);
+    }
+
+    /**
+     * Clear all messages in a conversation (group owner only).
+     * DELETE /api/v1/conversations/{conversation}/messages
+     */
+    public function clearAll(Request $request, Conversation $conversation): JsonResponse
+    {
+        if (!$conversation->is_group) {
+            return response()->json(['message' => 'Only group chats can be cleared.'], 422);
+        }
+
+        $myRole = $conversation->users()
+            ->where('users.id', $request->user()->id)
+            ->first()?->pivot?->role;
+
+        if ($myRole !== 'owner') {
+            return response()->json(['message' => 'Only the group owner can clear all messages.'], 403);
+        }
+
+        // Delete R2 files for messages with media
+        $mediaMessages = $conversation->messages()
+            ->whereNotNull('media_url')
+            ->pluck('media_url');
+
+        $publicPrefix = config('filesystems.disks.s3.url', '');
+        foreach ($mediaMessages as $url) {
+            if ($publicPrefix && str_starts_with($url, $publicPrefix)) {
+                $path = ltrim(substr($url, strlen($publicPrefix)), '/');
+                try {
+                    Storage::disk('s3')->delete($path);
+                } catch (\Throwable) { /* skip on error */ }
+            }
+        }
+
+        $conversation->messages()->delete();
+        $conversation->update(['pinned_message_id' => null]);
+
+        return response()->json(['message' => 'Chat cleared.']);
     }
 
     /**

@@ -115,13 +115,11 @@ class AdminController extends Controller
             });
         }
 
-        // Filter by subscription status
-        if ($request->has('subscription')) {
-            if ($request->subscription === 'subscribed') {
-                $query->whereHas('subscriptions', fn($q) => $q->active());
-            } elseif ($request->subscription === 'unsubscribed') {
-                $query->whereDoesntHave('subscriptions', fn($q) => $q->active());
-            }
+        // Filter by subscription plan slug (free, premium, vip, etc.)
+        if ($request->filled('plan')) {
+            $query->whereHas('subscriptions', fn($q) => $q->active()
+                ->whereHas('plan', fn($pq) => $pq->where('slug', $request->plan))
+            );
         }
 
         // Filter by email verification status

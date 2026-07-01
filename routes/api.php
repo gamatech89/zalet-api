@@ -32,7 +32,9 @@ use App\Http\Controllers\Api\V1\CreatorRequestController;
 use App\Http\Controllers\Api\V1\WalletController;
 use App\Http\Controllers\Api\V1\AdminSettingsController;
 use App\Http\Controllers\Api\V1\BanController;
+use App\Http\Controllers\Api\V1\BlockController;
 use App\Http\Controllers\Api\V1\NotificationController;
+use App\Http\Controllers\Api\V1\ReportController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -68,8 +70,17 @@ Route::prefix('v1')->group(function () {
         Route::prefix('auth')->middleware('throttle:auth')->group(function () {
             Route::post('/register', [AuthController::class , 'register']);
             Route::post('/login', [AuthController::class , 'login']);
-        }
-        );
+            Route::post('/forgot-password', [AuthController::class , 'forgotPassword']);
+            Route::post('/reset-password', [AuthController::class , 'resetPassword']);
+            // Email verification (signed URL — no auth required, link comes from email)
+            Route::get('/verify-email/{id}/{hash}', [AuthController::class , 'verifyEmail'])
+                ->middleware('signed')
+                ->name('verification.verify');
+        });
+
+        // Resend verification (requires auth, not verified)
+        Route::post('/auth/verify-email/resend', [AuthController::class , 'resendVerification'])
+            ->middleware('auth:sanctum');
 
         // Gift catalog (public - anyone can view) - moderate rate limiting
         Route::get('/gifts', [GiftController::class , 'index'])->middleware('throttle:public');
@@ -223,6 +234,17 @@ Route::prefix('v1')->group(function () {
                 // Moments routes - all authenticated users can post moments
                 Route::post('/moments', [MomentController::class , 'store']);
                 Route::delete('/moments/{media}', [MomentController::class , 'destroy']);
+
+                // Block system
+                Route::prefix('blocks')->group(function () {
+                    Route::get('/', [BlockController::class, 'index']);
+                    Route::post('/', [BlockController::class, 'store']);
+                    Route::get('/{user}', [BlockController::class, 'check']);
+                    Route::delete('/{user}', [BlockController::class, 'destroy']);
+                });
+
+                // Reports (user-submitted)
+                Route::post('/reports', [ReportController::class, 'store']);
 
                 // Community Board Posts (Sprint 7) - protected
                 Route::prefix('boards/{board:slug}/posts')->group(function () {
@@ -410,6 +432,10 @@ Route::prefix('v1')->group(function () {
                 // Platform settings
                 Route::get('/settings', [AdminSettingsController::class, 'index']);
                 Route::put('/settings/{key}', [AdminSettingsController::class, 'update']);
+
+                // Reports moderation
+                Route::get('/reports', [ReportController::class, 'adminIndex']);
+                Route::patch('/reports/{report}', [ReportController::class, 'adminUpdate']);
 
                 // Gift Management
                 Route::patch('/gifts/reorder', [AdminGiftController::class, 'reorder']);

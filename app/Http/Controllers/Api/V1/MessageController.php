@@ -99,11 +99,21 @@ class MessageController extends Controller
             $path = $file->store('chat-media/' . $conversation->id, 's3');
             $data['media_url'] = Storage::disk('s3')->url($path);
 
-            // Determine message type from MIME
-            $mime = $file->getMimeType();
-            if (str_starts_with($mime, 'image/')) {
+            // Determine message type — check both finfo-detected MIME and client-reported MIME.
+            // PHP finfo reports video/webm for audio-only WebM containers, so we also
+            // check the client MIME type and file extension as fallbacks.
+            $mime       = $file->getMimeType() ?? '';
+            $clientMime = $file->getClientMimeType() ?? '';
+            $ext        = strtolower($file->getClientOriginalExtension());
+            $audioExts  = ['webm', 'm4a', 'ogg', 'mp3', 'wav'];
+
+            if (str_starts_with($mime, 'image/') || str_starts_with($clientMime, 'image/')) {
                 $data['message_type'] = 'image';
-            } elseif (str_starts_with($mime, 'audio/')) {
+            } elseif (
+                str_starts_with($mime, 'audio/') ||
+                str_starts_with($clientMime, 'audio/') ||
+                in_array($ext, $audioExts)
+            ) {
                 $data['message_type'] = 'audio';
             } else {
                 $data['message_type'] = 'file';

@@ -526,7 +526,25 @@ class RaiffeisenPaymentService
             return $this->processCardRegistrationPayment($data, $orderId);
         }
 
-        // Find the pending transaction
+        // Subscription flow (ZSUB- prefix) — no Transaction record involved
+        if ($this->isSubscriptionPayment($orderId)) {
+            if ($tranCode === '000' && !empty($approvalCode)) {
+                return $this->processSubscriptionPayment($data, $orderId);
+            }
+            Log::warning('Subscription payment failed', ['order_id' => $orderId, 'tran_code' => $tranCode]);
+            return $this->buildWebhookResponse($data, 'reverse', 'Payment declined');
+        }
+
+        // Upgrade flow (ZUPG- prefix) — no Transaction record involved
+        if ($this->isUpgradePayment($orderId)) {
+            if ($tranCode === '000' && !empty($approvalCode)) {
+                return $this->processUpgradePayment($data, $orderId);
+            }
+            Log::warning('Upgrade payment failed', ['order_id' => $orderId, 'tran_code' => $tranCode]);
+            return $this->buildWebhookResponse($data, 'reverse', 'Payment declined');
+        }
+
+        // Coin deposit flow — requires a pending Transaction record
         $transaction = Transaction::where('raiffeisen_order_id', $orderId)
             ->where('type', 'deposit')
             ->where('status', 'pending')
@@ -540,11 +558,6 @@ class RaiffeisenPaymentService
         // Check if payment was successful
         // TranCode '000' typically means success in UPC gateway
         if ($tranCode === '000' && !empty($approvalCode)) {
-            // Determine if this is a subscription payment or coin deposit
-            if ($this->isSubscriptionPayment($orderId)) {
-                return $this->processSubscriptionPayment($data, $orderId);
-            }
-
             // Coin deposit flow
             $this->coinService->confirmDeposit($transaction);
 
@@ -867,6 +880,109 @@ class RaiffeisenPaymentService
     protected function isSubscriptionPayment(string $orderId): bool
     {
         return str_starts_with($orderId, 'ZSUB-');
+    }
+
+    protected function generateUpgradeOrderId(): string
+    {
+        return 'ZUPG-' . now()->format('Ymd') . '-' . strtoupper(Str::random(6));
+    }
+
+    protected function isUpgradePayment(string $orderId): bool
+    {
+        return str_starts_with($orderId, 'ZUPG-');
+    }
+
+    public function createUpgradePayment(
+        User $user,
+        SubscriptionPlan $newPlan,
+        string $billingCycle,
+        Subscription $oldSubscription,
+        float $chargeAmount
+    ): array {
+        $orderId = $this->generateUpgradeOrderId();
+        $amountInParas = (int) round($chargeAmount * 100);
+
+        $sd = base64_encode(json_encode([
+            'o' => $orderId,
+            'u' => $user->id,
+            'p' => $newPlan->id,
+            'c' => $billingCycle,
+            's' => $oldSubscription->id,
+            't' => time(),
+        ]));
+
+        $paymentUrl = $this->buildPaymentUrl([
+            'MerchantID'  => $this->merchantId,
+            'TerminalID'  => $this->terminalId,
+            'TotalAmount' => $amountInParas,
+            'Currency'    => '941',
+            'locale'      => 'sr',
+            'OrderID'     => $orderId,
+            'PurchaseTime' => now()->format('ymdHis'),
+            'SD'          => $sd,
+        ]);
+
+        Log::info('Subscription upgrade payment created', [
+            'user_id'          => $user->id,
+            'old_plan'         => $oldSubscription->subscription_plan_id,
+            'new_plan'         => $newPlan->id,
+            'order_id'         => $orderId,
+            'charge_amount_rsd' => $chargeAmount,
+        ]);
+
+        return [
+            'payment_url'  => $paymentUrl,
+            'order_id'     => $orderId,
+            'amount'       => $chargeAmount,
+            'currency'     => 'RSD',
+            'billing_cycle' => $billingCycle,
+        ];
+    }
+
+    protected function processUpgradePayment(array $data, string $orderId): array
+    {
+        $sd = json_decode(base64_decode($data['SD'] ?? ''), true);
+
+        if (!$sd || empty($sd['u']) || empty($sd['p']) || empty($sd['s'])) {
+            Log::error('Invalid upgrade session data', ['order_id' => $orderId]);
+            return $this->buildWebhookResponse($data, 'reverse', 'Invalid session data');
+        }
+
+        // Idempotency: if a subscription already references this order, skip
+        if (Subscription::where('raiffeisen_order_id', $orderId)->exists()) {
+            return $this->buildWebhookResponse($data, 'approve', 'ok');
+        }
+
+        $user = User::find($sd['u']);
+        $newPlan = SubscriptionPlan::find($sd['p']);
+        $oldSubscription = Subscription::find($sd['s']);
+        $billingCycle = $sd['c'] ?? 'monthly';
+        $pricePaid = ($data['TotalAmount'] ?? 0) / 100;
+
+        if (!$user || !$newPlan || !$oldSubscription) {
+            Log::error('Upgrade payment: user, plan, or old subscription not found', [
+                'order_id' => $orderId, 'user_id' => $sd['u'],
+                'plan_id' => $sd['p'], 'sub_id' => $sd['s'],
+            ]);
+            return $this->buildWebhookResponse($data, 'reverse', 'Resource not found');
+        }
+
+        try {
+            $this->subscriptionService->upgrade($oldSubscription, $newPlan, $billingCycle, $orderId, $pricePaid);
+
+            Log::info('Subscription upgrade confirmed', [
+                'user_id'  => $user->id,
+                'new_plan' => $newPlan->id,
+                'order_id' => $orderId,
+            ]);
+
+            return $this->buildWebhookResponse($data, 'approve', 'ok');
+        } catch (\Exception $e) {
+            Log::error('Subscription upgrade processing failed', [
+                'order_id' => $orderId, 'error' => $e->getMessage(),
+            ]);
+            return $this->buildWebhookResponse($data, 'reverse', 'Processing failed');
+        }
     }
 
     /**

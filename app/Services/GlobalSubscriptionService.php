@@ -53,6 +53,44 @@ class GlobalSubscriptionService
     }
 
     /**
+     * Upgrade an active subscription to a higher plan.
+     * Immediately cancels the old subscription and creates a new one.
+     */
+    public function upgrade(
+        Subscription $oldSubscription,
+        SubscriptionPlan $newPlan,
+        string $billingCycle,
+        string $raiffeisenOrderId,
+        float $pricePaid
+    ): Subscription {
+        $duration = $billingCycle === 'yearly' ? 365 : 30;
+        $user = $oldSubscription->user;
+
+        return DB::transaction(function () use ($oldSubscription, $newPlan, $billingCycle, $raiffeisenOrderId, $pricePaid, $duration, $user) {
+            $oldSubscription->update([
+                'status'       => 'cancelled',
+                'auto_renew'   => false,
+                'cancelled_at' => now(),
+            ]);
+
+            return Subscription::create([
+                'user_id'              => $user->id,
+                'subscription_plan_id' => $newPlan->id,
+                'billing_cycle'        => $billingCycle,
+                'price_paid'           => $pricePaid,
+                'starts_at'            => now(),
+                'ends_at'              => now()->addDays($duration),
+                'status'               => 'active',
+                'auto_renew'           => true,
+                'raiffeisen_order_id'  => $raiffeisenOrderId,
+                'next_billing_date'    => $billingCycle === 'monthly'
+                    ? now()->addMonth()->toDateString()
+                    : now()->addYear()->toDateString(),
+            ]);
+        });
+    }
+
+    /**
      * Cancel a subscription (keeps access until ends_at, just disables auto-renew).
      */
     public function cancel(Subscription $subscription): Subscription

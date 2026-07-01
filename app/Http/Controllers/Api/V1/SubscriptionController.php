@@ -279,6 +279,77 @@ class SubscriptionController extends Controller
         ]);
     }
 
+    /**
+     * Upgrade current subscription to a higher plan with proration.
+     *
+     * POST /api/v1/subscriptions/upgrade
+     */
+    public function upgrade(Request $request): JsonResponse
+    {
+        $request->validate([
+            'plan_id'       => ['required', 'uuid', 'exists:subscription_plans,id'],
+            'billing_cycle' => ['required', 'in:monthly,yearly'],
+        ]);
+
+        $user = $request->user();
+
+        $currentSub = $user->subscriptions()
+            ->whereIn('status', ['active', 'past_due'])
+            ->with('plan')
+            ->latest()
+            ->first();
+
+        if (!$currentSub) {
+            return response()->json(['message' => 'No active subscription to upgrade.'], 404);
+        }
+
+        $newPlan = SubscriptionPlan::findOrFail($request->input('plan_id'));
+
+        if (!$newPlan->is_active) {
+            return response()->json(['message' => 'This plan is not currently available.'], 400);
+        }
+
+        $newPrice = $this->subscriptionService->calculatePrice($newPlan, $request->input('billing_cycle'));
+        $currentPrice = $currentSub->price_paid;
+
+        // Proration: credit for remaining days
+        $daysTotal     = max(1, $currentSub->starts_at->diffInDays($currentSub->ends_at));
+        $daysRemaining = max(0, (int) ceil(now()->floatDiffInDays($currentSub->ends_at)));
+        $creditRsd     = ($daysRemaining / $daysTotal) * $currentPrice;
+
+        // Ignore small credits (< 100 RSD) — not worth a separate redirect
+        if ($creditRsd < 100) {
+            $creditRsd = 0;
+        }
+
+        $chargeAmount = max(0, $newPrice - $creditRsd);
+
+        // Downgrade guard: charge must be positive (upgrading, not downgrading)
+        if ($chargeAmount <= 0) {
+            return response()->json(['message' => 'Nije moguće nadograditi — novi plan nije skuplji od trenutnog.'], 422);
+        }
+
+        try {
+            $paymentData = $this->paymentService->createUpgradePayment(
+                user: $user,
+                newPlan: $newPlan,
+                billingCycle: $request->input('billing_cycle'),
+                oldSubscription: $currentSub,
+                chargeAmount: $chargeAmount,
+            );
+
+            return response()->json([
+                'message' => 'Upgrade initiated. Complete payment to activate.',
+                'data'    => array_merge($paymentData, [
+                    'credit_rsd'    => round($creditRsd, 2),
+                    'days_remaining' => $daysRemaining,
+                ]),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
     protected function formatSubscription($subscription): array
     {
         $subscription->loadMissing(['plan', 'paymentMethod']);

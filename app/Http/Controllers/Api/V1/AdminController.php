@@ -593,6 +593,7 @@ class AdminController extends Controller
                 'id' => $m->id,
                 'title' => $m->title,
                 'thumbnail_url' => $m->thumbnail_url,
+                'video_url' => $m->url,
                 'user' => [
                     'id' => $m->user->id,
                     'username' => $m->user->username,

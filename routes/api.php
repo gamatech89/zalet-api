@@ -444,6 +444,10 @@ Route::prefix('v1')->group(function () {
                 Route::get('/settings', [AdminSettingsController::class, 'index']);
                 Route::put('/settings/{key}', [AdminSettingsController::class, 'update']);
 
+                // Subscription Plans
+                Route::get('/subscription-plans', [SubscriptionPlanController::class, 'adminIndex']);
+                Route::put('/subscription-plans/{plan}', [SubscriptionPlanController::class, 'adminUpdate']);
+
                 // Reports moderation
                 Route::get('/reports', [ReportController::class, 'adminIndex']);
                 Route::patch('/reports/{report}', [ReportController::class, 'adminUpdate']);

@@ -196,6 +196,23 @@ class PlanLimitsService
         return ['allowed' => true, 'reason' => null, 'coin_cost' => 0];
     }
 
+    /**
+     * Check if user can create a new group chat.
+     */
+    public function canCreateGroup(User $user): bool|string
+    {
+        $limits = $this->getLimits($user);
+
+        if (!($limits['can_create_group'] ?? false)) {
+            $level = $this->getUserLevel($user);
+            $planName = $this->getPlanName($level);
+
+            return "Creating group chats is not available on your {$planName} plan. Upgrade to VIP.";
+        }
+
+        return true;
+    }
+
     // ─── Community Creation ───
 
     /**

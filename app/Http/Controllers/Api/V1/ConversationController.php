@@ -164,10 +164,10 @@ class ConversationController extends Controller
 
         if ($isGroup) {
             $planLimitsService = app(PlanLimitsService::class);
-            $canJoin = $planLimitsService->canJoinGroup($user);
-            if ($canJoin !== true) {
+            $canCreate = $planLimitsService->canCreateGroup($user);
+            if ($canCreate !== true) {
                 return response()->json([
-                    'message' => $canJoin,
+                    'message' => $canCreate,
                     'error_type' => 'plan_limit',
                 ], 403);
             }

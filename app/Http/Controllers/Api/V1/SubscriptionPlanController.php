@@ -29,7 +29,7 @@ class SubscriptionPlanController extends Controller
                 'price_monthly' => $plan->price_monthly,
                 'price_yearly' => $plan->price_yearly,
                 'features' => $plan->features ?? [],
-                'limits' => $plan->limits ?? [],
+                'limits' => $this->effectiveLimits($plan),
                 'sort_order' => $plan->sort_order,
             ]);
 
@@ -52,7 +52,7 @@ class SubscriptionPlanController extends Controller
             'price_monthly' => $plan->price_monthly,
             'price_yearly' => $plan->price_yearly,
             'features' => $plan->features ?? [],
-            'limits' => $plan->limits ?? [],
+            'limits' => $this->effectiveLimits($plan),
             'is_active' => $plan->is_active,
             'sort_order' => $plan->sort_order,
             'subscriber_count' => $plan->activeSubscriberCount(),
@@ -95,8 +95,17 @@ class SubscriptionPlanController extends Controller
 
         $plan->update($data);
 
-        return response()->json(['data' => array_merge($plan->toArray(), [
+        return response()->json(['data' => [
+            ...$plan->toArray(),
+            'limits' => $this->effectiveLimits($plan),
             'subscriber_count' => $plan->activeSubscriberCount(),
-        ])]);
+        ]]);
+    }
+
+    private function effectiveLimits(SubscriptionPlan $plan): array
+    {
+        $configDefaults = config("plan_limits.{$plan->level}", []);
+        $dbLimits = $plan->limits ?? [];
+        return array_merge($configDefaults, array_filter($dbLimits, fn ($v) => $v !== null));
     }
 }

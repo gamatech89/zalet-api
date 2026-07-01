@@ -13,13 +13,14 @@ return new class extends Migration
             $table->unsignedTinyInteger('subscription_level')->default(0)->after('is_legacy_founder');
         });
 
-        // Sync existing users based on their current active subscriptions
+        // Sync existing users based on their current active subscriptions (PostgreSQL syntax)
         DB::statement("
-            UPDATE users u
-            INNER JOIN subscriptions s ON s.user_id = u.id
-            INNER JOIN subscription_plans sp ON sp.id = s.subscription_plan_id
-            SET u.subscription_level = sp.level
-            WHERE s.status IN ('active', 'cancelled')
+            UPDATE users
+            SET subscription_level = sp.level
+            FROM subscriptions s
+            JOIN subscription_plans sp ON sp.id = s.subscription_plan_id
+            WHERE s.user_id = users.id
+              AND s.status IN ('active', 'cancelled')
               AND s.ends_at > NOW()
               AND sp.level > 0
         ");

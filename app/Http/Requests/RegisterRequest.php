@@ -42,9 +42,9 @@ class RegisterRequest extends FormRequest
                 $ip     = $this->ip();
 
                 $blocked = BannedIdentifier::where(function ($q) use ($email, $domain, $ip) {
-                    $q->where(['type' => 'email', 'value' => $email])
-                      ->orWhere(['type' => 'email_domain', 'value' => $domain])
-                      ->orWhere(['type' => 'ip', 'value' => $ip]);
+                    $q->where(fn ($s) => $s->where('type', 'email')->where('value', $email))
+                      ->orWhere(fn ($s) => $s->where('type', 'email_domain')->where('value', $domain))
+                      ->orWhere(fn ($s) => $s->where('type', 'ip')->where('value', $ip));
                 })->exists();
 
                 if ($blocked) {

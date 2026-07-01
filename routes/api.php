@@ -377,6 +377,7 @@ Route::prefix('v1')->group(function () {
                     Route::patch('/{conversation}', [ConversationController::class, 'update']);
                     Route::get('/{conversation}/messages', [MessageController::class , 'index']);
                     Route::post('/{conversation}/messages', [MessageController::class , 'store']);
+                    Route::get('/{conversation}/messages/around/{message}', [MessageController::class, 'around']);
                     Route::post('/{conversation}/messages/{message}/reactions', [MessageController::class , 'addReaction']);
                     Route::delete('/{conversation}/messages/{message}', [MessageController::class, 'destroy']);
                     Route::post('/{conversation}/typing', [MessageController::class , 'typing']);

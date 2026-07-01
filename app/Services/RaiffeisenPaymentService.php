@@ -7,6 +7,7 @@ use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Notifications\CoinDepositConfirmed;
 use App\Notifications\SubscriptionConfirmed;
 use App\Notifications\SubscriptionRenewed;
 use Illuminate\Support\Facades\Log;
@@ -227,7 +228,8 @@ class RaiffeisenPaymentService
 
             // Check if token payment was immediately approved
             if ($tranCode === '000') {
-                $this->coinService->confirmDeposit($transaction);
+                $this->coinService->confirmDeposit($transaction->fresh());
+                $user->notify(new CoinDepositConfirmed($transaction->fresh(), $amountRsd));
             }
 
         } catch (\Exception $e) {
@@ -562,6 +564,13 @@ class RaiffeisenPaymentService
         if ($tranCode === '000' && !empty($approvalCode)) {
             // Coin deposit flow
             $this->coinService->confirmDeposit($transaction);
+            $amountRsdFromWebhook = isset($data['TotalAmount']) ? (int) $data['TotalAmount'] / 100 : 0;
+            $transaction->load('toWallet.user');
+            if ($transaction->toWallet?->user) {
+                $transaction->toWallet->user->notify(
+                    new CoinDepositConfirmed($transaction->fresh(), $amountRsdFromWebhook)
+                );
+            }
 
             // Raiffeisen webhook sends the card token either as:
             // - 'UPCToken' when UPC Token Service is explicitly active

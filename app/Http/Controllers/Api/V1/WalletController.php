@@ -196,7 +196,10 @@ class WalletController extends Controller
 
         try {
             // If a saved payment method is provided, use tokenized payment
-            if ($paymentMethodId) {
+            // Tokenized (payByToken) only works for amounts up to 2400 RSD — fall back to redirect above that
+            $useTokenized = $paymentMethodId && $amount <= 2400;
+
+            if ($useTokenized) {
                 $paymentMethod = PaymentMethod::where('id', $paymentMethodId)
                     ->where('user_id', $user->id)
                     ->firstOrFail();

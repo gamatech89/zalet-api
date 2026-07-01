@@ -201,6 +201,10 @@ class PlanLimitsService
      */
     public function canCreateGroup(User $user): bool|string
     {
+        if ($user->isAdmin() || $user->isCreator()) {
+            return true;
+        }
+
         $limits = $this->getLimits($user);
 
         if (!($limits['can_create_group'] ?? false)) {

@@ -104,13 +104,33 @@ class AdminController extends Controller
             $query->where('is_legacy_founder', filter_var($request->is_legacy_founder, FILTER_VALIDATE_BOOLEAN));
         }
 
-        // Search by email or username (case-insensitive)
+        // Search by email, username, or IP address (case-insensitive)
         if ($request->has('search')) {
             $search = strtolower($request->search);
             $query->where(function ($q) use ($search) {
                 $q->whereRaw('LOWER(email) LIKE ?', ["%{$search}%"])
-                  ->orWhereRaw('LOWER(username) LIKE ?', ["%{$search}%"]);
+                  ->orWhereRaw('LOWER(username) LIKE ?', ["%{$search}%"])
+                  ->orWhere('last_ip', 'LIKE', "%{$search}%")
+                  ->orWhere('registration_ip', 'LIKE', "%{$search}%");
             });
+        }
+
+        // Filter by subscription status
+        if ($request->has('subscription')) {
+            if ($request->subscription === 'subscribed') {
+                $query->whereHas('subscriptions', fn($q) => $q->active());
+            } elseif ($request->subscription === 'unsubscribed') {
+                $query->whereDoesntHave('subscriptions', fn($q) => $q->active());
+            }
+        }
+
+        // Filter by email verification status
+        if ($request->has('verified')) {
+            if ($request->verified === 'verified') {
+                $query->whereNotNull('email_verified_at');
+            } elseif ($request->verified === 'unverified') {
+                $query->whereNull('email_verified_at');
+            }
         }
 
         // Sorting
@@ -121,7 +141,8 @@ class AdminController extends Controller
 
         $users = $query->select([
             'id', 'username', 'email', 'role', 'is_active', 'is_legacy_founder',
-            'last_ip', 'registration_ip', 'suspended_until', 'suspension_reason', 'created_at',
+            'last_ip', 'registration_ip', 'suspended_until', 'suspension_reason',
+            'email_verified_at', 'created_at',
         ])->paginate($request->get('per_page', 20));
 
         return response()->json([

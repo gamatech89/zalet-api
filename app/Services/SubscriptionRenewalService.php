@@ -104,6 +104,7 @@ class SubscriptionRenewalService
                 'renewal_attempts' => $attempts,
                 'last_renewal_error' => $error,
             ]);
+            $subscription->user->update(['subscription_level' => 0]);
             $subscription->user->notify(new SubscriptionExpired($subscription));
 
             Log::warning('Subscription expired after max retries', [

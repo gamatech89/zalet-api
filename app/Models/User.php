@@ -51,6 +51,7 @@ class User extends Authenticatable implements FilamentUser, HasName, MustVerifyE
         'suspended_until',
         'suspension_reason',
         'name_changed_at',
+        'subscription_level',
     ];
 
     protected $hidden = [
@@ -69,6 +70,7 @@ class User extends Authenticatable implements FilamentUser, HasName, MustVerifyE
             'is_legacy_founder' => 'boolean',
             'storage_limit_mb' => 'integer',
             'storage_used_bytes' => 'integer',
+            'subscription_level' => 'integer',
         ];
     }
 

@@ -33,7 +33,7 @@ class MessageController extends Controller
             ->pluck('blocked_id');
 
         $query = $conversation->messages()
-            ->with(['sender:id,username,name', 'sender.profile:user_id,avatar_url', 'reactions.user:id,username', 'repliedTo.sender:id,username,name'])
+            ->with(['sender:id,username,name,subscription_level', 'sender.profile:user_id,avatar_url', 'reactions.user:id,username', 'repliedTo.sender:id,username,name,subscription_level'])
             ->when($blockedIds->isNotEmpty(), fn($q) => $q->whereNotIn('sender_id', $blockedIds));
 
         if ($request->filled('before_id')) {
@@ -115,7 +115,7 @@ class MessageController extends Controller
         }
 
         $message = $conversation->messages()->create($data);
-        $message->load(['sender:id,username,name', 'sender.profile:user_id,avatar_url', 'reactions', 'repliedTo.sender:id,username,name']);
+        $message->load(['sender:id,username,name,subscription_level', 'sender.profile:user_id,avatar_url', 'reactions', 'repliedTo.sender:id,username,name,subscription_level']);
 
         // Update conversation timestamp
         $conversation->touch();
@@ -207,7 +207,7 @@ class MessageController extends Controller
         $limit = 25;
 
         $before = $conversation->messages()
-            ->with(['sender:id,username,name', 'sender.profile:user_id,avatar_url', 'reactions.user:id,username', 'repliedTo.sender:id,username,name'])
+            ->with(['sender:id,username,name,subscription_level', 'sender.profile:user_id,avatar_url', 'reactions.user:id,username', 'repliedTo.sender:id,username,name,subscription_level'])
             ->where('created_at', '<=', $message->created_at)
             ->where('id', '!=', $message->id)
             ->orderBy('created_at', 'desc')
@@ -217,13 +217,13 @@ class MessageController extends Controller
             ->values();
 
         $after = $conversation->messages()
-            ->with(['sender:id,username,name', 'sender.profile:user_id,avatar_url', 'reactions.user:id,username', 'repliedTo.sender:id,username,name'])
+            ->with(['sender:id,username,name,subscription_level', 'sender.profile:user_id,avatar_url', 'reactions.user:id,username', 'repliedTo.sender:id,username,name,subscription_level'])
             ->where('created_at', '>', $message->created_at)
             ->orderBy('created_at', 'asc')
             ->limit($limit)
             ->get();
 
-        $message->load(['sender:id,username,name', 'reactions.user:id,username', 'repliedTo.sender:id,username,name']);
+        $message->load(['sender:id,username,name,subscription_level', 'reactions.user:id,username', 'repliedTo.sender:id,username,name,subscription_level']);
 
         $all = $before->concat([$message])->concat($after);
 
@@ -364,6 +364,7 @@ class MessageController extends Controller
                 'username' => $message->sender->username,
                 'name' => $message->sender->name ?: null,
                 'avatar_url' => $message->sender->profile?->avatar_url,
+                'subscription_level' => $message->sender->subscription_level,
             ],
             'reactions' => $this->formatReactions($message),
             'reply_to' => $message->repliedTo ? [

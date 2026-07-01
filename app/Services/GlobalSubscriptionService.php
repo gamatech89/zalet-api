@@ -35,7 +35,7 @@ class GlobalSubscriptionService
         $duration = $billingCycle === 'yearly' ? 365 : 30;
 
         return DB::transaction(function () use ($user, $plan, $billingCycle, $raiffeisenOrderId, $pricePaid, $duration) {
-            return Subscription::create([
+            $subscription = Subscription::create([
                 'user_id' => $user->id,
                 'subscription_plan_id' => $plan->id,
                 'billing_cycle' => $billingCycle,
@@ -49,6 +49,8 @@ class GlobalSubscriptionService
                     ? now()->addMonth()->toDateString()
                     : now()->addYear()->toDateString(),
             ]);
+            $user->update(['subscription_level' => $plan->level]);
+            return $subscription;
         });
     }
 
@@ -73,7 +75,7 @@ class GlobalSubscriptionService
                 'cancelled_at' => now(),
             ]);
 
-            return Subscription::create([
+            $subscription = Subscription::create([
                 'user_id'              => $user->id,
                 'subscription_plan_id' => $newPlan->id,
                 'billing_cycle'        => $billingCycle,
@@ -87,6 +89,8 @@ class GlobalSubscriptionService
                     ? now()->addMonth()->toDateString()
                     : now()->addYear()->toDateString(),
             ]);
+            $user->update(['subscription_level' => $newPlan->level]);
+            return $subscription;
         });
     }
 
@@ -156,8 +160,7 @@ class GlobalSubscriptionService
 
             $duration = $billingCycle === 'yearly' ? 365 : 30;
 
-            // Create new subscription
-            return Subscription::create([
+            $newSubscription = Subscription::create([
                 'user_id' => $subscription->user_id,
                 'subscription_plan_id' => $newPlan->id,
                 'billing_cycle' => $billingCycle,
@@ -171,6 +174,8 @@ class GlobalSubscriptionService
                     ? now()->addMonth()->toDateString()
                     : now()->addYear()->toDateString(),
             ]);
+            $subscription->user->update(['subscription_level' => $newPlan->level]);
+            return $newSubscription;
         });
     }
 
@@ -180,9 +185,17 @@ class GlobalSubscriptionService
      */
     public function checkAndExpire(): int
     {
-        return Subscription::where('status', 'active')
+        $subscriptions = Subscription::where('status', 'active')
             ->where('ends_at', '<', now())
-            ->update(['status' => 'expired']);
+            ->with('user')
+            ->get();
+
+        foreach ($subscriptions as $subscription) {
+            $subscription->update(['status' => 'expired']);
+            $subscription->user?->update(['subscription_level' => 0]);
+        }
+
+        return $subscriptions->count();
     }
 
     /**

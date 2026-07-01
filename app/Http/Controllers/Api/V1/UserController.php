@@ -51,6 +51,7 @@ class UserController extends Controller
                     'avatar_url' => $user->profile?->avatar_url,
                     'bio' => $user->profile?->bio,
                     'role' => $user->role,
+                    'subscription_level' => $user->subscription_level,
                     'is_following' => $currentUserId ? $user->followers->isNotEmpty() : false,
                     'type' => 'user',
                 ];
@@ -112,6 +113,8 @@ class UserController extends Controller
             'username' => $user->username,
             'name' => $user->name,
             'role' => $user->role,
+            'subscription_level' => $user->subscription_level,
+            'is_legacy_founder' => $user->is_legacy_founder,
             'avatar_url' => $user->profile->avatar_url,
             'bio' => $user->profile->bio,
             'location' => $user->profile->current_city && $user->profile->current_country

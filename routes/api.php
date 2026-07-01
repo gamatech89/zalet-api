@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\V1\SubscriptionController;
 use App\Http\Controllers\Api\V1\SubscriptionPlanController;
 use App\Http\Controllers\Api\V1\CreatorRequestController;
 use App\Http\Controllers\Api\V1\WalletController;
+use App\Http\Controllers\Api\V1\AdminSettingsController;
 use App\Http\Controllers\Api\V1\BanController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use Illuminate\Support\Facades\Route;
@@ -374,14 +375,18 @@ Route::prefix('v1')->group(function () {
                 Route::get('/stats', [AdminController::class , 'stats']);
                 Route::get('/users', [AdminController::class , 'listUsers']);
                 Route::patch('/users/{user}', [AdminController::class , 'updateUser']);
+                Route::delete('/users/{user}', [AdminController::class , 'deleteUser']);
                 Route::post('/users/{user}/founder', [AdminController::class , 'markFounder']);
+                Route::post('/users/{user}/suspend', [AdminController::class , 'suspendUser']);
+                Route::delete('/users/{user}/suspend', [AdminController::class , 'unsuspendUser']);
                 Route::get('/transactions', [AdminController::class , 'listTransactions']);
                 Route::get('/media', [AdminController::class , 'listMedia']);
                 Route::delete('/media/{media}', [AdminController::class , 'deleteMedia']);
                 Route::get('/streams', [AdminController::class , 'listStreams']);
                 Route::post('/streams/{liveStream}/end', [AdminController::class , 'endStream']);
 
-                // Community approval
+                // Community management
+                Route::get('/communities', [AdminController::class, 'listCommunities']);
                 Route::get('/communities/pending', [AdminController::class, 'listPendingCommunities']);
                 Route::patch('/communities/{board}', [AdminController::class, 'reviewCommunity']);
 
@@ -390,6 +395,21 @@ Route::prefix('v1')->group(function () {
                 Route::post('/bans', [BanController::class, 'store']);
                 Route::delete('/bans/{ban}', [BanController::class, 'destroy']);
                 Route::post('/users/{user}/ban', [BanController::class, 'banUser']);
+
+                // Coin Packages (admin CRUD)
+                Route::get('/coin-packages', [CoinPackageController::class, 'adminIndex']);
+                Route::post('/coin-packages', [CoinPackageController::class, 'store']);
+                Route::put('/coin-packages/{package}', [CoinPackageController::class, 'update']);
+                Route::delete('/coin-packages/{package}', [CoinPackageController::class, 'destroy']);
+
+                // Moments moderation
+                Route::get('/moments/pending', [AdminController::class, 'pendingMoments']);
+                Route::post('/moments/{media}/approve', [AdminController::class, 'approveMoment']);
+                Route::post('/moments/{media}/reject', [AdminController::class, 'rejectMoment']);
+
+                // Platform settings
+                Route::get('/settings', [AdminSettingsController::class, 'index']);
+                Route::put('/settings/{key}', [AdminSettingsController::class, 'update']);
 
                 // Gift Management
                 Route::patch('/gifts/reorder', [AdminGiftController::class, 'reorder']);

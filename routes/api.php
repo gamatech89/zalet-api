@@ -396,6 +396,8 @@ Route::prefix('v1')->group(function () {
                     Route::post('/{conversation}/bans', [ConversationController::class, 'banMember']);
                     Route::delete('/{conversation}/bans/{member}', [ConversationController::class, 'unbanMember']);
                     Route::delete('/{conversation}/leave', [ConversationController::class, 'leave']);
+                    Route::delete('/{conversation}', [ConversationController::class, 'destroy']);
+                    Route::post('/{conversation}/unlock', [ConversationController::class, 'unlockGroup']);
                     Route::post('/{conversation}/pin-message', [ConversationController::class, 'pinMessage']);
                     Route::delete('/{conversation}/pin-message', [ConversationController::class, 'unpinMessage']);
                 }
@@ -413,6 +415,8 @@ Route::prefix('v1')->group(function () {
                 Route::post('/users/{user}/suspend', [AdminController::class , 'suspendUser']);
                 Route::delete('/users/{user}/suspend', [AdminController::class , 'unsuspendUser']);
                 Route::get('/transactions', [AdminController::class , 'listTransactions']);
+                Route::get('/transactions/{transaction}', [AdminController::class, 'showTransaction']);
+                Route::post('/reset-economy', [AdminController::class, 'resetEconomy']);
                 Route::get('/media', [AdminController::class , 'listMedia']);
                 Route::delete('/media/{media}', [AdminController::class , 'deleteMedia']);
                 Route::get('/streams', [AdminController::class , 'listStreams']);

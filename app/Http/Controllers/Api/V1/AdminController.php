@@ -259,7 +259,7 @@ class AdminController extends Controller
      */
     public function listTransactions(Request $request): JsonResponse
     {
-        $query = Transaction::with(['fromWallet.user', 'toWallet.user']);
+        $query = Transaction::with(['fromWallet.user:id,username', 'toWallet.user:id,username', 'gift:id,name']);
 
         // Filter by type
         if ($request->has('type')) {
@@ -287,14 +287,93 @@ class AdminController extends Controller
 
         $transactions = $query->paginate($request->get('per_page', 20));
 
+        $mapped = collect($transactions->items())->map(fn (Transaction $tx) => [
+            'id' => $tx->id,
+            'type' => $tx->type,
+            'amount' => $tx->amount,
+            'status' => $tx->status,
+            'description' => $tx->description,
+            'raiffeisen_order_id' => $tx->raiffeisen_order_id,
+            'from_user' => $tx->fromWallet?->user?->username,
+            'from_user_id' => $tx->fromWallet?->user?->id,
+            'to_user' => $tx->toWallet?->user?->username,
+            'to_user_id' => $tx->toWallet?->user?->id,
+            'gift_name' => $tx->gift?->name,
+            'created_at' => $tx->created_at->toIso8601String(),
+        ]);
+
         return response()->json([
-            'data' => $transactions->items(),
+            'data' => $mapped,
             'meta' => [
                 'current_page' => $transactions->currentPage(),
                 'last_page' => $transactions->lastPage(),
                 'per_page' => $transactions->perPage(),
                 'total' => $transactions->total(),
             ],
+        ]);
+    }
+
+    /**
+     * Show single transaction details.
+     * GET /api/v1/admin/transactions/{transaction}
+     */
+    public function showTransaction(Transaction $transaction): JsonResponse
+    {
+        $transaction->load(['fromWallet.user:id,username,email', 'toWallet.user:id,username,email', 'gift', 'media:id,title,type']);
+
+        return response()->json([
+            'data' => [
+                'id' => $transaction->id,
+                'type' => $transaction->type,
+                'amount' => $transaction->amount,
+                'status' => $transaction->status,
+                'description' => $transaction->description,
+                'raiffeisen_order_id' => $transaction->raiffeisen_order_id,
+                'from_user' => $transaction->fromWallet?->user ? [
+                    'id' => $transaction->fromWallet->user->id,
+                    'username' => $transaction->fromWallet->user->username,
+                    'email' => $transaction->fromWallet->user->email,
+                ] : null,
+                'to_user' => $transaction->toWallet?->user ? [
+                    'id' => $transaction->toWallet->user->id,
+                    'username' => $transaction->toWallet->user->username,
+                    'email' => $transaction->toWallet->user->email,
+                ] : null,
+                'gift' => $transaction->gift ? [
+                    'id' => $transaction->gift->id,
+                    'name' => $transaction->gift->name,
+                ] : null,
+                'media' => $transaction->media ? [
+                    'id' => $transaction->media->id,
+                    'title' => $transaction->media->title,
+                    'type' => $transaction->media->type,
+                ] : null,
+                'created_at' => $transaction->created_at->toIso8601String(),
+                'updated_at' => $transaction->updated_at->toIso8601String(),
+            ],
+        ]);
+    }
+
+    /**
+     * Reset all economy data (wallets + transactions).
+     * POST /api/v1/admin/reset-economy
+     */
+    public function resetEconomy(Request $request): JsonResponse
+    {
+        $request->validate([
+            'confirm' => ['required', 'string', 'in:RESET'],
+        ]);
+
+        $txCount = Transaction::count();
+        $walletCount = \App\Models\Wallet::where('balance', '>', 0)->count();
+
+        DB::transaction(function () {
+            Transaction::query()->delete();
+            \App\Models\Wallet::query()->update(['balance' => 0]);
+        });
+
+        return response()->json([
+            'message' => "Economy reset: {$txCount} transactions deleted, {$walletCount} wallets zeroed.",
         ]);
     }
 

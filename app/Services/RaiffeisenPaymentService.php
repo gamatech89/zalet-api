@@ -7,6 +7,8 @@ use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Notifications\SubscriptionConfirmed;
+use App\Notifications\SubscriptionRenewed;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -1050,9 +1052,11 @@ class RaiffeisenPaymentService
                 ->first();
 
             if ($existing) {
-                $this->subscriptionService->renew($existing, $orderId, $pricePaid);
+                $renewed = $this->subscriptionService->renew($existing, $orderId, $pricePaid);
+                $user->notify(new SubscriptionRenewed($renewed));
             } else {
-                $this->subscriptionService->subscribe($user, $plan, $billingCycle, $orderId, $pricePaid);
+                $confirmed = $this->subscriptionService->subscribe($user, $plan, $billingCycle, $orderId, $pricePaid);
+                $user->notify(new SubscriptionConfirmed($confirmed));
             }
 
             Log::info('Subscription payment confirmed', [

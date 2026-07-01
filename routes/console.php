@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
+use App\Jobs\ProcessExpiryReminders;
 use App\Jobs\ProcessSubscriptionRenewals;
 
 Artisan::command('inspire', function () {
@@ -18,5 +19,11 @@ Schedule::command('chat:prune-attachments')->weekly()->sundays()->at('02:00');
 // Process subscription renewals daily at 07:00 Belgrade time.
 Schedule::job(ProcessSubscriptionRenewals::class)
     ->dailyAt('07:00')
+    ->timezone('Europe/Belgrade')
+    ->withoutOverlapping();
+
+// Send expiry reminders daily at 08:00 Belgrade time (7 and 3 days before end).
+Schedule::job(ProcessExpiryReminders::class)
+    ->dailyAt('08:00')
     ->timezone('Europe/Belgrade')
     ->withoutOverlapping();

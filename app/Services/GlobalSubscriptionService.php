@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\DB;
 
 class GlobalSubscriptionService
 {
+    public function __construct(private CoinService $coinService) {}
+
     /**
      * Create a subscription after payment is confirmed.
      */
@@ -50,6 +52,12 @@ class GlobalSubscriptionService
                     : now()->addYear()->toDateString(),
             ]);
             $user->update(['subscription_level' => $plan->level]);
+
+            $bonusCoins = $plan->limits['monthly_free_coins'] ?? 0;
+            if ($bonusCoins > 0) {
+                $this->coinService->credit($user, (float) $bonusCoins, 'Subscription bonus coins');
+            }
+
             return $subscription;
         });
     }
@@ -90,6 +98,12 @@ class GlobalSubscriptionService
                     : now()->addYear()->toDateString(),
             ]);
             $user->update(['subscription_level' => $newPlan->level]);
+
+            $bonusCoins = $newPlan->limits['monthly_free_coins'] ?? 0;
+            if ($bonusCoins > 0) {
+                $this->coinService->credit($user, (float) $bonusCoins, 'Subscription bonus coins');
+            }
+
             return $subscription;
         });
     }
@@ -123,7 +137,7 @@ class GlobalSubscriptionService
         $plan = $subscription->plan;
         $duration = $subscription->billing_cycle === 'yearly' ? 365 : 30;
 
-        return DB::transaction(function () use ($subscription, $raiffeisenOrderId, $pricePaid, $duration) {
+        $renewed = DB::transaction(function () use ($subscription, $raiffeisenOrderId, $pricePaid, $duration) {
             $subscription->update([
                 'starts_at' => now(),
                 'ends_at' => now()->addDays($duration),
@@ -139,6 +153,13 @@ class GlobalSubscriptionService
 
             return $subscription->fresh();
         });
+
+        $bonusCoins = $plan->limits['monthly_free_coins'] ?? 0;
+        if ($bonusCoins > 0) {
+            $this->coinService->credit($subscription->user, (float) $bonusCoins, 'Subscription renewal bonus coins');
+        }
+
+        return $renewed;
     }
 
     /**
@@ -175,6 +196,12 @@ class GlobalSubscriptionService
                     : now()->addYear()->toDateString(),
             ]);
             $subscription->user->update(['subscription_level' => $newPlan->level]);
+
+            $bonusCoins = $newPlan->limits['monthly_free_coins'] ?? 0;
+            if ($bonusCoins > 0) {
+                $this->coinService->credit($subscription->user, (float) $bonusCoins, 'Subscription bonus coins');
+            }
+
             return $newSubscription;
         });
     }

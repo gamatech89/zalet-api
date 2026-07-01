@@ -33,7 +33,7 @@ class MessageController extends Controller
             ->pluck('blocked_id');
 
         $query = $conversation->messages()
-            ->with(['sender:id,username,name,subscription_level', 'sender.profile:user_id,avatar_url', 'reactions.user:id,username', 'repliedTo.sender:id,username,name,subscription_level'])
+            ->with(['sender:id,username,name,subscription_level,role', 'sender.profile:user_id,avatar_url', 'reactions.user:id,username', 'repliedTo.sender:id,username,name,subscription_level,role'])
             ->when($blockedIds->isNotEmpty(), fn($q) => $q->whereNotIn('sender_id', $blockedIds));
 
         if ($request->filled('before_id')) {
@@ -126,7 +126,7 @@ class MessageController extends Controller
         }
 
         $message = $conversation->messages()->create($data);
-        $message->load(['sender:id,username,name,subscription_level', 'sender.profile:user_id,avatar_url', 'reactions', 'repliedTo.sender:id,username,name,subscription_level']);
+        $message->load(['sender:id,username,name,subscription_level,role', 'sender.profile:user_id,avatar_url', 'reactions', 'repliedTo.sender:id,username,name,subscription_level,role']);
 
         // Update conversation timestamp
         $conversation->touch();
@@ -218,7 +218,7 @@ class MessageController extends Controller
         $limit = 25;
 
         $before = $conversation->messages()
-            ->with(['sender:id,username,name,subscription_level', 'sender.profile:user_id,avatar_url', 'reactions.user:id,username', 'repliedTo.sender:id,username,name,subscription_level'])
+            ->with(['sender:id,username,name,subscription_level,role', 'sender.profile:user_id,avatar_url', 'reactions.user:id,username', 'repliedTo.sender:id,username,name,subscription_level,role'])
             ->where('created_at', '<=', $message->created_at)
             ->where('id', '!=', $message->id)
             ->orderBy('created_at', 'desc')
@@ -228,7 +228,7 @@ class MessageController extends Controller
             ->values();
 
         $after = $conversation->messages()
-            ->with(['sender:id,username,name,subscription_level', 'sender.profile:user_id,avatar_url', 'reactions.user:id,username', 'repliedTo.sender:id,username,name,subscription_level'])
+            ->with(['sender:id,username,name,subscription_level,role', 'sender.profile:user_id,avatar_url', 'reactions.user:id,username', 'repliedTo.sender:id,username,name,subscription_level,role'])
             ->where('created_at', '>', $message->created_at)
             ->orderBy('created_at', 'asc')
             ->limit($limit)
@@ -415,12 +415,14 @@ class MessageController extends Controller
                 'name' => $message->sender->name ?: null,
                 'avatar_url' => $message->sender->profile?->avatar_url,
                 'subscription_level' => $message->sender->subscription_level,
+                'is_creator' => in_array($message->sender->role, ['creator', 'admin']),
             ],
             'reactions' => $this->formatReactions($message),
             'reply_to' => $message->repliedTo ? [
                 'id' => $message->repliedTo->id,
                 'content' => $message->repliedTo->content,
                 'message_type' => $message->repliedTo->message_type ?? 'text',
+                'media_url' => $message->repliedTo->media_url,
                 'sender' => [
                     'id' => $message->repliedTo->sender->id,
                     'username' => $message->repliedTo->sender->username,

@@ -40,7 +40,7 @@ class MessageSentEvent implements ShouldBroadcastNow
      */
     public function broadcastWith(): array
     {
-        $this->message->load(['sender:id,username,name', 'sender.profile:user_id,avatar_url', 'reactions.user:id,username', 'repliedTo.sender:id,username,name']);
+        $this->message->load(['sender:id,username,name,subscription_level,role', 'sender.profile:user_id,avatar_url', 'reactions.user:id,username', 'repliedTo.sender:id,username,name,subscription_level,role']);
 
         return [
             'id' => $this->message->id,
@@ -50,6 +50,8 @@ class MessageSentEvent implements ShouldBroadcastNow
                 'username' => $this->message->sender->username,
                 'name' => $this->message->sender->name ?: null,
                 'avatar_url' => $this->message->sender->profile?->avatar_url,
+                'subscription_level' => $this->message->sender->subscription_level,
+                'is_creator' => in_array($this->message->sender->role, ['creator', 'admin']),
             ],
             'content' => $this->message->content,
             'message_type' => $this->message->message_type ?? 'text',

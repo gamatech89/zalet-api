@@ -79,6 +79,32 @@ class CoinService
     }
 
     /**
+     * Directly credit coins to a user's wallet (no payment flow — used for bonuses, rewards, etc).
+     */
+    public function credit(User $user, float $amount, string $description = 'Bonus coins'): Transaction
+    {
+        if ($amount <= 0) {
+            throw new \InvalidArgumentException('Credit amount must be positive.');
+        }
+
+        return DB::transaction(function () use ($user, $amount, $description) {
+            $wallet = $this->ensureWallet($user);
+            $wallet = Wallet::where('id', $wallet->id)->lockForUpdate()->first();
+
+            $wallet->increment('balance', $amount);
+
+            return Transaction::create([
+                'from_wallet_id' => null,
+                'to_wallet_id'   => $wallet->id,
+                'amount'         => $amount,
+                'type'           => 'deposit',
+                'status'         => 'completed',
+                'description'    => $description,
+            ]);
+        });
+    }
+
+    /**
      * Transfer coins between users (tip, subscription, PPV).
      */
     public function transfer(

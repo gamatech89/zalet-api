@@ -22,7 +22,7 @@ class SendMessageRequest extends FormRequest
     {
         return [
             'content' => ['nullable', 'string', 'max:5000'],
-            'media' => ['nullable', 'file', 'mimes:jpg,jpeg,png,gif,webp,pdf,doc,docx,zip', 'max:10240'], // 10MB
+            'media' => ['nullable', 'file', 'mimes:jpg,jpeg,png,gif,webp,pdf,doc,docx,zip,webm,mp4,m4a,ogg,mp3,wav', 'max:20480'], // 20MB (audio/video included)
             'reply_to_id' => ['nullable', 'uuid', 'exists:messages,id'],
         ];
     }

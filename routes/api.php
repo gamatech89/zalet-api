@@ -108,6 +108,7 @@ Route::prefix('v1')->group(function () {
         // Payment webhooks (public - verified via signature)
         Route::prefix('webhooks')->group(function () {
             Route::post('/raiffeisen', [PaymentWebhookController::class , 'handleNotification']);
+            Route::post('/livekit', [\App\Http\Controllers\Api\V1\LiveKitWebhookController::class, 'handle']);
         });
 
         // Payment callbacks (public - browser redirects after payment)
@@ -171,6 +172,7 @@ Route::prefix('v1')->group(function () {
         // Live Streaming (public - anyone can browse & watch)
         Route::prefix('streams')->group(function () {
             Route::get('/live', [LiveStreamController::class , 'live']);
+            Route::get('/upcoming', [LiveStreamController::class, 'upcoming']);
             Route::get('/{liveStream}', [LiveStreamController::class , 'show'])
                 ->where('liveStream', '[0-9a-f\-]{36}');
             Route::get('/{liveStream}/token', [LiveStreamController::class , 'viewerToken'])
@@ -216,6 +218,7 @@ Route::prefix('v1')->group(function () {
                 Route::prefix('payment-methods')->group(function () {
                     Route::get('/', [PaymentMethodController::class, 'index']);
                     Route::post('/', [PaymentMethodController::class, 'store']);
+                    Route::post('/add-card', [PaymentMethodController::class, 'addCard']);
                     Route::put('/{paymentMethod}/default', [PaymentMethodController::class, 'setDefault']);
                     Route::delete('/', [PaymentMethodController::class, 'destroyAll']);
                     Route::delete('/{paymentMethod}', [PaymentMethodController::class, 'destroy']);
@@ -311,6 +314,7 @@ Route::prefix('v1')->group(function () {
                     // Scena (long-form video upload + embed) - creator only
                     Route::post('/scena/embed', [ScenaController::class , 'embed']);
                     Route::post('/scena', [ScenaController::class , 'store']);
+                    Route::post('/scena/{media}', [ScenaController::class , 'update']);
                     Route::delete('/scena/{media}', [ScenaController::class , 'destroy']);
 
                     // Live Streaming management - creator only
@@ -334,6 +338,8 @@ Route::prefix('v1')->group(function () {
 
                 // Board Admin (auth required)
                 Route::prefix('boards/{board:slug}')->group(function () {
+                    Route::patch('/', [BoardAdminController::class, 'updateBoard']);
+                    Route::post('/cover', [BoardAdminController::class, 'updateCover']);
                     Route::post('/posts', [BoardPostController::class , 'store']);
                     Route::post('/upload-image', [BoardPostController::class , 'uploadImage']);
                     Route::delete('/posts/{post}', [BoardPostController::class , 'destroy']);
@@ -378,12 +384,14 @@ Route::prefix('v1')->group(function () {
                     Route::get('/{conversation}/messages', [MessageController::class , 'index']);
                     Route::post('/{conversation}/messages', [MessageController::class , 'store']);
                     Route::get('/{conversation}/messages/around/{message}', [MessageController::class, 'around']);
+                    Route::patch('/{conversation}/messages/{message}', [MessageController::class, 'update']);
                     Route::post('/{conversation}/messages/{message}/reactions', [MessageController::class , 'addReaction']);
                     Route::delete('/{conversation}/messages/{message}', [MessageController::class, 'destroy']);
                     Route::post('/{conversation}/typing', [MessageController::class , 'typing']);
                     Route::post('/{conversation}/read', [ConversationController::class, 'markRead']);
                     Route::post('/{conversation}/members', [ConversationController::class, 'addMembers']);
                     Route::delete('/{conversation}/members/{member}', [ConversationController::class, 'kickMember']);
+                    Route::delete('/{conversation}/members/{member}/messages', [MessageController::class, 'destroyUserMessages']);
                     Route::patch('/{conversation}/members/{member}/role', [ConversationController::class, 'updateMemberRole']);
                     Route::post('/{conversation}/bans', [ConversationController::class, 'banMember']);
                     Route::delete('/{conversation}/bans/{member}', [ConversationController::class, 'unbanMember']);

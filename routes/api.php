@@ -162,8 +162,10 @@ Route::prefix('v1')->group(function () {
             Route::get('/{board:slug}/posts/{post}', [BoardPostController::class , 'show']);
             Route::get('/{board:slug}/categories', [BoardAdminController::class , 'listCategories']);
             Route::get('/{board:slug}/members', [BoardAdminController::class , 'listMembers']);
+            Route::get('/{board:slug}/streams', [BoardController::class, 'streams']);
             Route::post('/{board:slug}/join', [BoardController::class, 'join'])->middleware('auth:sanctum');
             Route::post('/{board:slug}/leave', [BoardController::class, 'leave'])->middleware('auth:sanctum');
+            Route::post('/{board:slug}/streams', [BoardController::class, 'scheduleStream'])->middleware('auth:sanctum');
         });
 
         // Live Streaming (public - anyone can browse & watch)

@@ -308,6 +308,8 @@ Route::prefix('v1')->group(function () {
                 Route::prefix('streams')->group(function () {
                     Route::post('/{liveStream}/chat', [LiveStreamController::class , 'sendChat']);
                     Route::post('/{liveStream}/gift', [StreamGiftController::class , 'store']);
+                    Route::post('/{liveStream}/react', [LiveStreamController::class , 'react'])
+                        ->middleware('throttle:stream-react');
                     Route::post('/{liveStream}/unlock', [LiveStreamController::class , 'unlock']);
                 });
 

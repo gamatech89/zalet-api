@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Events\StreamChatMessage;
+use App\Events\StreamReactionEvent;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateStreamRequest;
 use App\Models\LiveStream;
@@ -376,6 +377,27 @@ class LiveStreamController extends Controller
                 'timestamp' => now()->toIso8601String(),
             ],
         ]);
+    }
+
+    /**
+     * Send heart reactions to a live stream (ephemeral — broadcast only).
+     * POST /api/v1/streams/{liveStream}/react
+     */
+    public function react(Request $request, LiveStream $liveStream): JsonResponse
+    {
+        $request->validate(['count' => ['required', 'integer', 'min:1', 'max:20']]);
+
+        if (!$liveStream->is_live) {
+            return response()->json(['message' => 'This stream is not currently live.'], 422);
+        }
+
+        broadcast(new StreamReactionEvent(
+            $liveStream->id,
+            $request->user()->username,
+            (int) $request->input('count'),
+        ));
+
+        return response()->json(['message' => 'ok']);
     }
 
     /**

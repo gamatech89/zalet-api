@@ -70,6 +70,15 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('chat', function (Request $request) {
             return Limit::perMinute(40)->by($request->user()?->id ?: $request->ip());
         });
+
+        // Stream heart reactions: 10 batched requests per minute per user per stream.
+        // Route param may still be the raw uuid string here (throttle can run
+        // before route-model binding) — handle both.
+        RateLimiter::for('stream-react', function (Request $request) {
+            $param    = $request->route('liveStream');
+            $streamId = is_object($param) ? $param->id : (string) ($param ?? 'none');
+            return Limit::perMinute(10)->by(($request->user()?->id ?: $request->ip()) . ':' . $streamId);
+        });
     }
 }
 

@@ -274,7 +274,11 @@ class LiveStreamController extends Controller
             }
         }
 
-        $identity = $user ? 'viewer-' . $user->id : 'guest-' . Str::random(8);
+        // Random suffix so the same user can watch from two devices/tabs
+        // without LiveKit kicking the first connection (DUPLICATE_IDENTITY)
+        $identity = $user
+            ? 'viewer-' . $user->id . '-' . strtolower(Str::random(6))
+            : 'guest-' . Str::random(8);
         $name = $user ? $user->username : 'Guest ' . Str::random(4);
 
         $token = $this->liveKit->isConfigured()

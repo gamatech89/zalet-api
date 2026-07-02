@@ -120,13 +120,13 @@ class LiveKitWebhookController extends Controller
 
     /**
      * Resolve a display name from a LiveKit participant identity.
-     * Identity format: "viewer-{userId}" or "guest-{random}"
+     * Identity format: "viewer-{userUuid}-{rand}" (or legacy "viewer-{userUuid}")
+     * and "guest-{random}".
      */
     private function resolveUsername(string $identity): string
     {
-        if (str_starts_with($identity, 'viewer-')) {
-            $userId = substr($identity, strlen('viewer-'));
-            $user   = User::find($userId);
+        if (preg_match('/^viewer-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i', $identity, $m)) {
+            $user = User::find($m[1]);
             if ($user) return $user->username;
         }
 

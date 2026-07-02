@@ -32,7 +32,7 @@ class NewNotificationEvent implements ShouldBroadcastNow
             'id'         => $this->notification->id,
             'type'       => $this->notification->type,
             'title'      => $this->notification->title,
-            'message'    => $this->notification->message,
+            'body'       => $this->notification->body,
             'data'       => $this->notification->data,
             'created_at' => $this->notification->created_at->toIso8601String(),
         ];

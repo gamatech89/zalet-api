@@ -17,7 +17,7 @@ class NotificationService
             'user_id'  => $recipient->id,
             'type'     => $type,
             'title'    => $title,
-            'message'  => $message,
+            'body'     => $message,
             'data'     => $data,
         ]);
 

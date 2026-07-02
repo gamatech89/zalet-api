@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Events\StreamEndedEvent;
 use App\Events\StreamGoalUpdatedEvent;
+use App\Jobs\NotifyFollowersStreamLive;
 use App\Models\LiveStream;
 use App\Models\StreamSession;
 use App\Models\User;
@@ -31,6 +32,8 @@ class LiveStreamService
         }
 
         $session = $stream->goLive();
+
+        NotifyFollowersStreamLive::dispatch($stream);
 
         return [
             'stream_id'  => $stream->id,

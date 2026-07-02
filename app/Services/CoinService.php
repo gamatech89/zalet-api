@@ -116,7 +116,8 @@ class CoinService
         string $type,
         ?Media $media = null,
         ?Gift $gift = null,
-        ?string $description = null
+        ?string $description = null,
+        ?StreamSession $session = null
     ): Transaction {
         if ($amount <= 0) {
             throw new \InvalidArgumentException('Transfer amount must be positive.');
@@ -126,7 +127,7 @@ class CoinService
             throw new \InvalidArgumentException('Invalid transfer type.');
         }
 
-        return DB::transaction(function () use ($fromUser, $toUser, $amount, $type, $media, $gift, $description) {
+        return DB::transaction(function () use ($fromUser, $toUser, $amount, $type, $media, $gift, $description, $session) {
             $fromWallet = $this->ensureWallet($fromUser);
             $toWallet = $this->ensureWallet($toUser);
 
@@ -164,14 +165,15 @@ class CoinService
             $toWallet->increment('balance', $receiverAmount);
 
             $transaction = Transaction::create([
-                'from_wallet_id' => $fromWallet->id,
-                'to_wallet_id'   => $toWallet->id,
-                'amount'         => $amount,
-                'type'           => $type,
-                'status'         => 'completed',
-                'media_id'       => $media?->id,
-                'gift_id'        => $gift?->id,
-                'description'    => $description,
+                'from_wallet_id'    => $fromWallet->id,
+                'to_wallet_id'      => $toWallet->id,
+                'amount'            => $amount,
+                'type'              => $type,
+                'status'            => 'completed',
+                'media_id'          => $media?->id,
+                'gift_id'           => $gift?->id,
+                'stream_session_id' => $session?->id,
+                'description'       => $description,
             ]);
 
             return $transaction;
@@ -206,7 +208,8 @@ class CoinService
             'tip',
             null,
             $gift,
-            "Stream gift: {$gift->name}"
+            "Stream gift: {$gift->name}",
+            $session
         );
 
         $session->addCoins((float) $gift->coin_price);

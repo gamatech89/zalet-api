@@ -20,6 +20,7 @@ class Transaction extends Model
         'raiffeisen_order_id',
         'media_id',
         'gift_id',
+        'stream_session_id',
         'description',
     ];
 

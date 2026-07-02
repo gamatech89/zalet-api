@@ -52,6 +52,12 @@ class GiftSentEvent implements ShouldBroadcastNow
                 'icon_3d' => $this->gift->icon_3d,
             ],
             'session_total' => (float) $this->session->fresh()->total_coins_collected,
+            'sender_session_total' => (float) \App\Models\Transaction::query()
+                ->where('stream_session_id', $this->session->id)
+                ->where('type', 'tip')
+                ->whereNotNull('gift_id')
+                ->where('from_wallet_id', $this->sender->wallet?->id)
+                ->sum('amount'),
             'timestamp' => now()->toIso8601String(),
         ];
     }

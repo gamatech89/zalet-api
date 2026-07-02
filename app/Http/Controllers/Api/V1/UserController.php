@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Block;
+use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -129,6 +130,61 @@ class UserController extends Controller
                 'is_following'    => $isFollowing,
                 'is_followed_by'  => $isFollowedBy,
             ]
+        ]);
+    }
+
+    /**
+     * Top gifters for a creator across all stream sessions.
+     * GET /api/v1/users/{user}/top-gifters?period=weekly|all  (public)
+     */
+    public function topGifters(Request $request, string $key): JsonResponse
+    {
+        $query = User::query();
+        if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $key)) {
+            $query->where('id', $key);
+        } else {
+            $query->where('username', $key);
+        }
+        $user = $query->firstOrFail();
+
+        $wallet = $user->wallet;
+        if (!$wallet) {
+            return response()->json(['data' => []]);
+        }
+
+        $period = $request->query('period', 'weekly') === 'all' ? 'all' : 'weekly';
+
+        $q = Transaction::query()
+            ->where('to_wallet_id', $wallet->id)
+            ->where('type', 'tip')
+            ->whereNotNull('gift_id')
+            ->whereNotNull('stream_session_id');
+
+        if ($period === 'weekly') {
+            $q->where('transactions.created_at', '>=', now()->subDays(7));
+        }
+
+        $rows = $q
+            ->join('wallets as w', 'w.id', '=', 'transactions.from_wallet_id')
+            ->join('users as u', 'u.id', '=', 'w.user_id')
+            ->leftJoin('profiles as p', 'p.user_id', '=', 'u.id')
+            ->groupBy('u.id', 'u.username', 'p.avatar_url')
+            ->orderByRaw('SUM(transactions.amount) DESC')
+            ->limit(10)
+            ->get([
+                DB::raw('u.id as user_id'),
+                'u.username',
+                'p.avatar_url',
+                DB::raw('SUM(transactions.amount) as total_coins'),
+            ]);
+
+        return response()->json([
+            'data' => $rows->map(fn ($r) => [
+                'user_id'     => $r->user_id,
+                'username'    => $r->username,
+                'avatar_url'  => $r->avatar_url,
+                'total_coins' => (float) $r->total_coins,
+            ]),
         ]);
     }
 }

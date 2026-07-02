@@ -103,6 +103,7 @@ Route::prefix('v1')->group(function () {
 
         // Public User Profiles
         Route::get('/users/suggested', [\App\Http\Controllers\Api\V1\UserController::class , 'suggested']);
+        Route::get('/users/{user}/top-gifters', [\App\Http\Controllers\Api\V1\UserController::class , 'topGifters']);
         Route::get('/users/{user}', [\App\Http\Controllers\Api\V1\UserController::class , 'show']);
 
         // Payment webhooks (public - verified via signature)
@@ -176,6 +177,8 @@ Route::prefix('v1')->group(function () {
             Route::get('/{liveStream}', [LiveStreamController::class , 'show'])
                 ->where('liveStream', '[0-9a-f\-]{36}');
             Route::get('/{liveStream}/token', [LiveStreamController::class , 'viewerToken'])
+                ->where('liveStream', '[0-9a-f\-]{36}');
+            Route::get('/{liveStream}/top-gifters', [StreamGiftController::class , 'topGifters'])
                 ->where('liveStream', '[0-9a-f\-]{36}');
         });
 

@@ -77,8 +77,8 @@ class LiveStreamService
     }
 
     /**
-     * Apply coins to the first incomplete goal on a stream.
-     * Broadcasts StreamGoalUpdatedEvent when progress changes.
+     * Apply coins to incomplete goals in order; overflow rolls into the next goal.
+     * Broadcasts StreamGoalUpdatedEvent per affected goal.
      * No-op if the stream has no goals or all are complete.
      */
     public function updateGoalProgress(LiveStream $stream, int $coinAmount): void
@@ -88,18 +88,31 @@ class LiveStreamService
             return;
         }
 
-        foreach ($goals as $idx => $goal) {
-            if ($goal['current_coins'] < $goal['target_coins']) {
-                $goals[$idx]['current_coins'] = min(
-                    $goal['current_coins'] + $coinAmount,
-                    $goal['target_coins']
-                );
-                $isNowDone = $goals[$idx]['current_coins'] >= $goals[$idx]['target_coins'];
+        $remaining = $coinAmount;
+        $affected  = []; // idx => isNowDone
 
-                $stream->update(['goals' => $goals]);
-                broadcast(new StreamGoalUpdatedEvent($stream->fresh(), $idx, $isNowDone));
-                break; // one goal at a time
+        foreach ($goals as $idx => $goal) {
+            if ($remaining <= 0) {
+                break;
             }
+            if ($goal['current_coins'] >= $goal['target_coins']) {
+                continue;
+            }
+            $applied = min($goal['target_coins'] - $goal['current_coins'], $remaining);
+            $goals[$idx]['current_coins'] += $applied;
+            $remaining -= $applied;
+            $affected[$idx] = $goals[$idx]['current_coins'] >= $goals[$idx]['target_coins'];
+        }
+
+        if (empty($affected)) {
+            return;
+        }
+
+        $stream->update(['goals' => $goals]);
+        $fresh = $stream->fresh();
+
+        foreach ($affected as $idx => $isNowDone) {
+            broadcast(new StreamGoalUpdatedEvent($fresh, $idx, $isNowDone));
         }
     }
 }

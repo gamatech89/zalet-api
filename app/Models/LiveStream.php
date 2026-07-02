@@ -32,6 +32,7 @@ class LiveStream extends Model
         'recording_size',
         'has_recording',
         'thumbnail_url',
+        'entry_price',
     ];
 
     protected function casts(): array
@@ -45,6 +46,7 @@ class LiveStream extends Model
             'goals' => 'array',
             'recording_duration' => 'integer',
             'recording_size' => 'integer',
+            'entry_price' => 'integer',
         ];
     }
 

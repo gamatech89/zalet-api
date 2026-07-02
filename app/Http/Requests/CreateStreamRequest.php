@@ -24,6 +24,7 @@ class CreateStreamRequest extends FormRequest
             'title' => ['required', 'string', 'max:100'],
             'stream_mode' => ['sometimes', 'string', 'in:scena,moments'],
             'stream_id' => ['sometimes', 'uuid'],
+            'entry_price' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:9999'],
         ];
     }
 

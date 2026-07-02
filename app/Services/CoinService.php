@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Models\AppSetting;
+use App\Models\Conversation;
 use App\Models\Gift;
+use App\Models\LiveStream;
 use App\Models\Media;
 use App\Models\StreamSession;
 use App\Models\Transaction;
@@ -251,6 +253,91 @@ class CoinService
                 'status'         => 'completed',
                 'media_id'       => $media->id,
                 'description'    => "PPV purchase: {$media->title}",
+            ]);
+        });
+    }
+
+    /**
+     * Purchase entry into a paid group. Full price goes to the group owner.
+     */
+    public function purchaseGroupEntry(User $buyer, Conversation $conversation): Transaction
+    {
+        if (!$conversation->entry_price || $conversation->entry_price <= 0) {
+            throw new \InvalidArgumentException('Group has no entry price.');
+        }
+
+        $owner = $conversation->users()->wherePivot('role', 'owner')->first();
+        if (!$owner) {
+            throw new \InvalidArgumentException('Group has no owner.');
+        }
+
+        $price = (float) $conversation->entry_price;
+
+        return DB::transaction(function () use ($buyer, $owner, $conversation, $price) {
+            $buyerWallet = $this->ensureWallet($buyer);
+            $ownerWallet = $this->ensureWallet($owner);
+
+            $walletIds = [$buyerWallet->id, $ownerWallet->id];
+            sort($walletIds);
+            Wallet::whereIn('id', $walletIds)->lockForUpdate()->get();
+
+            $buyerWallet = $buyerWallet->fresh();
+            $ownerWallet = $ownerWallet->fresh();
+
+            if (!$buyerWallet->hasBalance($price)) {
+                throw new \RuntimeException('Insufficient balance.');
+            }
+
+            $buyerWallet->decrement('balance', $price);
+            $ownerWallet->increment('balance', $price);
+
+            return Transaction::create([
+                'from_wallet_id' => $buyerWallet->id,
+                'to_wallet_id'   => $ownerWallet->id,
+                'amount'         => $price,
+                'type'           => 'group_entry',
+                'status'         => 'completed',
+                'description'    => "Ulaz u grupu: {$conversation->name}",
+            ]);
+        });
+    }
+
+    /**
+     * Purchase entry into a paid live stream. Full price goes to the streamer.
+     */
+    public function purchaseStreamEntry(User $buyer, LiveStream $stream): Transaction
+    {
+        if (!$stream->entry_price || $stream->entry_price <= 0) {
+            throw new \InvalidArgumentException('Stream has no entry price.');
+        }
+
+        $price = (float) $stream->entry_price;
+
+        return DB::transaction(function () use ($buyer, $stream, $price) {
+            $buyerWallet = $this->ensureWallet($buyer);
+            $streamerWallet = $this->ensureWallet($stream->user);
+
+            $walletIds = [$buyerWallet->id, $streamerWallet->id];
+            sort($walletIds);
+            Wallet::whereIn('id', $walletIds)->lockForUpdate()->get();
+
+            $buyerWallet = $buyerWallet->fresh();
+            $streamerWallet = $streamerWallet->fresh();
+
+            if (!$buyerWallet->hasBalance($price)) {
+                throw new \RuntimeException('Insufficient balance.');
+            }
+
+            $buyerWallet->decrement('balance', $price);
+            $streamerWallet->increment('balance', $price);
+
+            return Transaction::create([
+                'from_wallet_id' => $buyerWallet->id,
+                'to_wallet_id'   => $streamerWallet->id,
+                'amount'         => $price,
+                'type'           => 'stream_entry',
+                'status'         => 'completed',
+                'description'    => "Ulaz na stream: {$stream->title}",
             ]);
         });
     }

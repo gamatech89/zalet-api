@@ -214,6 +214,8 @@ Route::prefix('v1')->group(function () {
                     Route::get('/withdrawal-preview', [WalletController::class , 'withdrawalPreview']);
                 });
 
+                Route::get('/settings/defaults', [AdminSettingsController::class, 'defaults']);
+
                 // Payment Methods (saved cards)
                 Route::prefix('payment-methods')->group(function () {
                     Route::get('/', [PaymentMethodController::class, 'index']);
@@ -303,6 +305,7 @@ Route::prefix('v1')->group(function () {
                 Route::prefix('streams')->group(function () {
                     Route::post('/{liveStream}/chat', [LiveStreamController::class , 'sendChat']);
                     Route::post('/{liveStream}/gift', [StreamGiftController::class , 'store']);
+                    Route::post('/{liveStream}/unlock', [LiveStreamController::class , 'unlock']);
                 });
 
                 // Creator-only content routes
@@ -399,6 +402,7 @@ Route::prefix('v1')->group(function () {
                     Route::delete('/{conversation}/leave', [ConversationController::class, 'leave']);
                     Route::delete('/{conversation}', [ConversationController::class, 'destroy']);
                     Route::post('/{conversation}/unlock', [ConversationController::class, 'unlockGroup']);
+                    Route::post('/{conversation}/pay-entry', [ConversationController::class, 'payGroupEntry']);
                     Route::post('/{conversation}/pin-message', [ConversationController::class, 'pinMessage']);
                     Route::delete('/{conversation}/pin-message', [ConversationController::class, 'unpinMessage']);
                 }

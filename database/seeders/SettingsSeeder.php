@@ -58,6 +58,18 @@ class SettingsSeeder extends Seeder
                 'type'        => 'integer',
                 'description' => 'Maksimalan broj PPV videa koje kreator može objaviti u jednom mesecu',
             ],
+            [
+                'key'         => 'default_group_entry_price',
+                'value'       => '0',
+                'type'        => 'integer',
+                'description' => 'Podrazumevana cena pridruživanja grupi koju kreator vidi kao predlog pri postavljanju cene',
+            ],
+            [
+                'key'         => 'default_stream_entry_price',
+                'value'       => '0',
+                'type'        => 'integer',
+                'description' => 'Podrazumevana cena gledanja streama koju kreator vidi kao predlog pri postavljanju cene',
+            ],
         ];
 
         foreach ($settings as $s) {

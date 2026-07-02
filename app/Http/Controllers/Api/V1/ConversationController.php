@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateConversationRequest;
 use App\Models\Block;
 use App\Models\Conversation;
+use App\Models\GroupEntry;
 use App\Models\GroupUnlock;
 use App\Models\Message;
 use App\Models\User;
@@ -237,6 +238,7 @@ class ConversationController extends Controller
                 'is_group' => $conversation->is_group,
                 'is_public' => $conversation->is_public,
                 'invite_code' => $conversation->is_public ? $conversation->invite_code : null,
+                'entry_price' => $conversation->entry_price,
                 'my_role' => $myUser?->pivot?->role,
                 'last_read_at' => ($lr = $myUser?->pivot?->last_read_at) ? now()->parse($lr)->toIso8601String() : null,
                 'participants' => $conversation->users->map(fn ($u) => [
@@ -296,7 +298,12 @@ class ConversationController extends Controller
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:100'],
             'is_public' => ['sometimes', 'boolean'],
+            'entry_price' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:9999'],
         ]);
+
+        if (array_key_exists('entry_price', $validated) && $this->getUserRole($request->user(), $conversation) !== 'owner') {
+            return response()->json(['message' => 'Only the group owner can set the entry price.'], 403);
+        }
 
         // Auto-generate invite code when making group public for the first time
         if (isset($validated['is_public']) && $validated['is_public'] && !$conversation->invite_code) {
@@ -312,6 +319,7 @@ class ConversationController extends Controller
                 'name' => $conversation->name,
                 'is_public' => $conversation->is_public,
                 'invite_code' => $conversation->is_public ? $conversation->invite_code : null,
+                'entry_price' => $conversation->entry_price,
             ],
         ]);
     }
@@ -568,6 +576,7 @@ class ConversationController extends Controller
                 'name' => $conversation->name,
                 'description' => $conversation->description ?? null,
                 'member_count' => $conversation->users_count,
+                'entry_price' => $conversation->entry_price,
                 'invite_code' => $conversation->invite_code,
                 'is_member' => $isMember,
             ],
@@ -602,6 +611,22 @@ class ConversationController extends Controller
                 'message' => 'You are already a member.',
                 'data' => ['id' => $conversation->id],
             ]);
+        }
+
+        if ($conversation->entry_price && $conversation->entry_price > 0 && !$user->hasSubscriptionLevel(1)) {
+            $alreadyPaid = GroupEntry::where('user_id', $user->id)
+                ->where('conversation_id', $conversation->id)
+                ->exists();
+
+            if (!$alreadyPaid) {
+                return response()->json([
+                    'message' => 'Ova grupa zahteva jednokratnu uplatu za pridruživanje.',
+                    'error_type' => 'entry_price',
+                    'can_pay' => true,
+                    'entry_price' => $conversation->entry_price,
+                    'group_id' => $conversation->id,
+                ], 403);
+            }
         }
 
         $planLimitsService = app(PlanLimitsService::class);
@@ -709,6 +734,48 @@ class ConversationController extends Controller
         GroupUnlock::create(['user_id' => $user->id, 'conversation_id' => $conversation->id]);
 
         return response()->json(['message' => 'Group unlocked! Možeš se sada pridružiti.']);
+    }
+
+    /**
+     * Pay a group's entry_price to unlock joining it (owner-priced groups).
+     * POST /api/v1/conversations/{conversation}/pay-entry
+     */
+    public function payGroupEntry(Request $request, Conversation $conversation, CoinService $coinService): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$conversation->is_group || !$conversation->is_public) {
+            return response()->json(['message' => 'Only public groups can be joined.'], 422);
+        }
+
+        if (!$conversation->entry_price || $conversation->entry_price <= 0) {
+            return response()->json(['message' => 'This group has no entry price.'], 422);
+        }
+
+        if ($conversation->users()->where('users.id', $user->id)->exists()) {
+            return response()->json(['message' => 'You are already a member.'], 422);
+        }
+
+        if ($user->hasSubscriptionLevel(1)) {
+            return response()->json(['message' => 'Premium/VIP korisnici se pridružuju besplatno.', 'already_unlocked' => true]);
+        }
+
+        if (GroupEntry::where('user_id', $user->id)->where('conversation_id', $conversation->id)->exists()) {
+            return response()->json(['message' => 'Uplata je već izvršena.', 'already_unlocked' => true]);
+        }
+
+        try {
+            $coinService->purchaseGroupEntry($user, $conversation);
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'message' => "Nedovoljno kovanica. Trebaš {$conversation->entry_price} ZC za pridruživanje.",
+                'balance_required' => $conversation->entry_price,
+            ], 422);
+        }
+
+        GroupEntry::create(['user_id' => $user->id, 'conversation_id' => $conversation->id]);
+
+        return response()->json(['message' => 'Uplata uspešna! Sada se možeš pridružiti grupi.']);
     }
 
     private function getConversationName(Conversation $conversation, $currentUser): string

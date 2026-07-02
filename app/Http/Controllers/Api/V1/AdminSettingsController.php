@@ -10,6 +10,20 @@ use Illuminate\Http\Request;
 class AdminSettingsController extends Controller
 {
     /**
+     * GET /api/v1/settings/defaults
+     * Public (any authenticated user) — used to pre-fill creator price fields.
+     */
+    public function defaults(): JsonResponse
+    {
+        return response()->json([
+            'data' => [
+                'default_group_entry_price' => AppSetting::get('default_group_entry_price', 0),
+                'default_stream_entry_price' => AppSetting::get('default_stream_entry_price', 0),
+            ],
+        ]);
+    }
+
+    /**
      * GET /api/v1/admin/settings
      */
     public function index(): JsonResponse

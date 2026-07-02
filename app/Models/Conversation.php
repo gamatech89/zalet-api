@@ -20,6 +20,7 @@ class Conversation extends Model
         'is_public',
         'invite_code',
         'pinned_message_id',
+        'entry_price',
     ];
 
     protected function casts(): array
@@ -27,6 +28,7 @@ class Conversation extends Model
         return [
             'is_group' => 'boolean',
             'is_public' => 'boolean',
+            'entry_price' => 'integer',
         ];
     }
 

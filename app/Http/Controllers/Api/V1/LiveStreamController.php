@@ -6,6 +6,8 @@ use App\Events\StreamChatMessage;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateStreamRequest;
 use App\Models\LiveStream;
+use App\Models\StreamUnlock;
+use App\Services\CoinService;
 use App\Services\LiveKitService;
 use App\Services\LiveStreamService;
 use Illuminate\Http\JsonResponse;
@@ -49,11 +51,13 @@ class LiveStreamController extends Controller
             $stream->update([
                 'title'       => $request->title,
                 'stream_mode' => $streamMode,
+                'entry_price' => $request->input('entry_price') ?: null,
             ]);
         } else {
             $stream = $user->liveStreams()->create([
                 'title'       => $request->title,
                 'stream_mode' => $streamMode,
+                'entry_price' => $request->input('entry_price') ?: null,
             ]);
         }
 
@@ -74,6 +78,7 @@ class LiveStreamController extends Controller
                 'stream_key' => $stream->stream_key,
                 'stream_mode' => $stream->stream_mode,
                 'is_live' => $stream->is_live,
+                'entry_price' => $stream->entry_price,
                 'livekit_token' => $publisherToken,
                 'livekit_ws_url' => $this->liveKit->getWsUrl(),
                 'created_at' => $stream->created_at->toIso8601String(),
@@ -254,6 +259,20 @@ class LiveStreamController extends Controller
             ], 422);
         }
 
+        $hasEntryPrice = $liveStream->entry_price && $liveStream->entry_price > 0;
+        if ($hasEntryPrice && (!$user || $user->id !== $liveStream->user_id)) {
+            $isUnlocked = $user && (
+                $user->hasSubscriptionLevel(1)
+                || StreamUnlock::where('user_id', $user->id)->where('live_stream_id', $liveStream->id)->exists()
+            );
+            if (!$isUnlocked) {
+                return response()->json([
+                    'message' => 'Ovaj stream zahteva otključavanje kovanicama.',
+                    'entry_price' => $liveStream->entry_price,
+                ], 403);
+            }
+        }
+
         $identity = $user ? 'viewer-' . $user->id : 'guest-' . Str::random(8);
         $name = $user ? $user->username : 'Guest ' . Str::random(4);
 
@@ -280,6 +299,44 @@ class LiveStreamController extends Controller
                 ],
             ],
         ]);
+    }
+
+    /**
+     * Pay a live stream's entry_price to unlock viewing it.
+     * POST /api/v1/streams/{liveStream}/unlock
+     */
+    public function unlock(Request $request, LiveStream $liveStream, CoinService $coinService): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$liveStream->entry_price || $liveStream->entry_price <= 0) {
+            return response()->json(['message' => 'This stream has no entry price.'], 422);
+        }
+
+        if ($user->id === $liveStream->user_id) {
+            return response()->json(['message' => 'You already own this stream.'], 422);
+        }
+
+        if ($user->hasSubscriptionLevel(1)) {
+            return response()->json(['message' => 'Premium/VIP korisnici gledaju besplatno.', 'already_unlocked' => true]);
+        }
+
+        if (StreamUnlock::where('user_id', $user->id)->where('live_stream_id', $liveStream->id)->exists()) {
+            return response()->json(['message' => 'Stream je već otključan.', 'already_unlocked' => true]);
+        }
+
+        try {
+            $coinService->purchaseStreamEntry($user, $liveStream);
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'message' => "Nedovoljno kovanica. Trebaš {$liveStream->entry_price} ZC za pristup streamu.",
+                'balance_required' => $liveStream->entry_price,
+            ], 422);
+        }
+
+        StreamUnlock::create(['user_id' => $user->id, 'live_stream_id' => $liveStream->id]);
+
+        return response()->json(['message' => 'Stream otključan!']);
     }
 
     /**
@@ -325,14 +382,23 @@ class LiveStreamController extends Controller
      * Get details of a specific stream.
      * GET /api/v1/streams/{liveStream}
      */
-    public function show(LiveStream $liveStream): JsonResponse
+    public function show(Request $request, LiveStream $liveStream): JsonResponse
     {
         $liveStream->load(['user:id,username', 'currentSession']);
+
+        $user = $request->user() ?? auth('sanctum')->user();
+        $hasEntryPrice = $liveStream->entry_price && $liveStream->entry_price > 0;
+        $isUnlocked = !$hasEntryPrice
+            || ($user && $user->id === $liveStream->user_id)
+            || ($user && $user->hasSubscriptionLevel(1))
+            || ($user && StreamUnlock::where('user_id', $user->id)->where('live_stream_id', $liveStream->id)->exists());
 
         return response()->json([
             'data' => [
                 'id' => $liveStream->id,
                 'title' => $liveStream->title,
+                'entry_price' => $liveStream->entry_price,
+                'is_unlocked' => $isUnlocked,
                 'stream_mode' => $liveStream->stream_mode,
                 'thumbnail_url' => $liveStream->thumbnail_url ? asset('storage/' . $liveStream->thumbnail_url) : null,
                 'is_live' => $liveStream->is_live,

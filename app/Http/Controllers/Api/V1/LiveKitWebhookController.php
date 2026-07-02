@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Events\StreamEndedEvent;
 use App\Events\ViewerJoinedEvent;
 use App\Events\ViewerLeftEvent;
 use App\Http\Controllers\Controller;
@@ -145,6 +146,12 @@ class LiveKitWebhookController extends Controller
                     'current_viewers' => 0,
                 ]);
             }
+            broadcast(new StreamEndedEvent(
+                $stream->id,
+                $session?->fresh()?->getDurationMinutes(),
+                (int) ($session?->peak_viewers ?? 0),
+                (float) ($session?->total_coins_collected ?? 0),
+            ));
             Log::info("[LiveKit Webhook] room_finished — stream {$stream->id} force-ended.");
         } else {
             // Room finished cleanly — still clear the room name

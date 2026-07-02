@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\StreamEndedEvent;
 use App\Events\StreamGoalUpdatedEvent;
 use App\Models\LiveStream;
 use App\Models\StreamSession;
@@ -52,6 +53,16 @@ class LiveStreamService
 
         $session = $stream->currentSession;
         $stream->endStream();
+
+        if ($session) {
+            $session->refresh();
+            broadcast(new StreamEndedEvent(
+                $stream->id,
+                $session->getDurationMinutes(),
+                (int) $session->peak_viewers,
+                (float) $session->total_coins_collected,
+            ));
+        }
 
         $this->liveKit->deleteRoom($stream);
         $stream->update(['livekit_room_name' => null]);

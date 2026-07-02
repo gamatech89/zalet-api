@@ -384,7 +384,7 @@ class LiveStreamController extends Controller
      */
     public function show(Request $request, LiveStream $liveStream): JsonResponse
     {
-        $liveStream->load(['user:id,username', 'currentSession']);
+        $liveStream->load(['user:id,username', 'user.profile:user_id,avatar_url', 'currentSession']);
 
         $user = $request->user() ?? auth('sanctum')->user();
         $hasEntryPrice = $liveStream->entry_price && $liveStream->entry_price > 0;
@@ -408,6 +408,7 @@ class LiveStreamController extends Controller
                 'streamer' => [
                     'id' => $liveStream->user->id,
                     'username' => $liveStream->user->username,
+                    'avatar_url' => $liveStream->user->profile?->avatar_url,
                 ],
                 'scheduled_at' => $liveStream->scheduled_at?->toIso8601String(),
                 'viewers' => $liveStream->currentSession?->current_viewers ?? 0,

@@ -7,8 +7,11 @@ use App\Http\Requests\UpdateUserRequest;
 use App\Models\Board;
 use App\Models\LiveStream;
 use App\Models\Media;
+use App\Models\SubscriptionPlan;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\CoinService;
+use App\Services\GlobalSubscriptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -250,6 +253,59 @@ class AdminController extends Controller
         return response()->json([
             'message' => 'User marked as legacy founder.',
             'data' => $user->fresh(),
+        ]);
+    }
+
+    /**
+     * Grant coins directly to a user's wallet (no payment).
+     * POST /api/v1/admin/users/{user}/grant-coins
+     */
+    public function grantCoins(Request $request, User $user, CoinService $coinService): JsonResponse
+    {
+        $validated = $request->validate([
+            'amount' => ['required', 'integer', 'min:1', 'max:1000000'],
+            'note'   => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $description = 'Admin grant'
+            . (!empty($validated['note']) ? ": {$validated['note']}" : '');
+
+        $coinService->credit($user, (float) $validated['amount'], $description);
+
+        return response()->json([
+            'message'     => "Dodato {$validated['amount']} ZC korisniku @{$user->username}.",
+            'new_balance' => $coinService->getBalance($user),
+        ]);
+    }
+
+    /**
+     * Grant a subscription directly to a user (no payment).
+     * POST /api/v1/admin/users/{user}/grant-subscription
+     */
+    public function grantSubscription(Request $request, User $user, GlobalSubscriptionService $subscriptions): JsonResponse
+    {
+        $validated = $request->validate([
+            'plan_level' => ['required', 'integer', 'in:1,2'],
+            'days'       => ['required', 'integer', 'in:30,90,365'],
+        ]);
+
+        $plan = SubscriptionPlan::active()
+            ->where('level', $validated['plan_level'])
+            ->first();
+
+        if (!$plan) {
+            return response()->json(['message' => 'No active subscription plan found for that level.'], 422);
+        }
+
+        $subscription = $subscriptions->grant($user, $plan, $validated['days']);
+
+        return response()->json([
+            'message' => "Dodeljena {$plan->name} pretplata korisniku @{$user->username} ({$validated['days']} dana).",
+            'data'    => [
+                'plan'    => $plan->name,
+                'level'   => $subscription->plan?->level,
+                'ends_at' => $subscription->ends_at->toIso8601String(),
+            ],
         ]);
     }
 

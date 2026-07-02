@@ -63,6 +63,59 @@ class GlobalSubscriptionService
     }
 
     /**
+     * Admin grant: give a user a subscription for free (no payment).
+     *
+     * If the user already has a still-valid subscription, extend its end date
+     * by $days and keep the higher of the two plan levels (never downgrade).
+     * Otherwise create a fresh comp subscription with auto_renew disabled so it
+     * simply expires and is never billed.
+     */
+    public function grant(User $user, SubscriptionPlan $plan, int $days): Subscription
+    {
+        return DB::transaction(function () use ($user, $plan, $days) {
+            $existing = Subscription::where('user_id', $user->id)
+                ->whereIn('status', ['active', 'past_due', 'cancelled'])
+                ->where('ends_at', '>', now())
+                ->with('plan')
+                ->orderByDesc('ends_at')
+                ->first();
+
+            if ($existing) {
+                $effectivePlan = ($plan->level > ($existing->plan?->level ?? 0))
+                    ? $plan
+                    : $existing->plan;
+
+                $existing->update([
+                    'ends_at'              => $existing->ends_at->copy()->addDays($days),
+                    'subscription_plan_id' => $effectivePlan->id,
+                    'status'               => 'active',
+                ]);
+
+                $user->update(['subscription_level' => $effectivePlan->level]);
+
+                return $existing->fresh('plan');
+            }
+
+            $subscription = Subscription::create([
+                'user_id'              => $user->id,
+                'subscription_plan_id' => $plan->id,
+                'billing_cycle'        => $days >= 365 ? 'yearly' : 'monthly',
+                'price_paid'           => 0,
+                'starts_at'            => now(),
+                'ends_at'              => now()->addDays($days),
+                'status'               => 'active',
+                'auto_renew'           => false,
+                'raiffeisen_order_id'  => null,
+                'next_billing_date'    => null,
+            ]);
+
+            $user->update(['subscription_level' => $plan->level]);
+
+            return $subscription->fresh('plan');
+        });
+    }
+
+    /**
      * Upgrade an active subscription to a higher plan.
      * Immediately cancels the old subscription and creates a new one.
      */
